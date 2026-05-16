@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Conecta Serviço</string>
+    <string name="title_activity_main">Conecta Serviço</string>
+    <string name="package_name">com.conectaservico.app</string>
+    <string name="custom_url_scheme">com.conectaservico.app</string>
+    <!-- Adicione seu Client ID Web do Google aqui -->
+    <string name="default_web_client_id">COLOQUE_SEU_WEB_CLIENT_ID_AQUI</string>
+</resources>

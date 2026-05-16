@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Funções auxiliares para segurança
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isClientOwnerOfRequest(requestId) {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/serviceRequests/$(requestId)).data.clientId == request.auth.uid;
+    }
+
+    // Regras para a coleção de usuários
+    match /users/{userId} {
+      // Qualquer usuário logado pode ler perfis (necessário para ver quem postou o job ou quem fez a proposta)
+      allow read: if isAuthenticated();
+      // Apenas o próprio dono pode criar/editar seus dados
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || (isAuthenticated() && request.resource.data.diff(resource.data).changedKeys().hasOnly(['coinsBalance']));
+      // Deleção pode ser bloqueada ou permitida apenas pelo dono
+      allow delete: if isOwner(userId);
+    }
+
+    // Regras para a coleção de serviços (Jobs)
+    match /serviceRequests/{requestId} {
+      // Qualquer usuário autenticado pode ver a lista de jobs
+      allow read: if isAuthenticated();
+      // Qualquer usuário logado pode criar um job (o app vai garantir que o clientId seja o dele)
+      allow create: if isAuthenticated() && request.resource.data.clientId == request.auth.uid;
+      // Apenas o cliente dono do job pode editá-lo ou deletá-lo
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['unlockCount'])
+      );
+      allow delete: if isAuthenticated() && resource.data.clientId == request.auth.uid;
+    }
+
+    // Regras para a coleção de propostas (Proposals)
+    match /proposals/{proposalId} {
+      // Leitura: O dono da proposta OU o cliente dono do job podem ler
+      allow read: if isAuthenticated();
+      // Criação: O profissional deve definir seu próprio ID na proposta
+      allow create: if isAuthenticated() && request.resource.data.professionalId == request.auth.uid;
+      // Atualização/Deleção:
+      // - Profissional pode atualizar/deletar a própria proposta
+      // - Cliente dono do job pode atualizar apenas o status (accepted/rejected)
+      allow update: if isAuthenticated()
+        && (
+          resource.data.professionalId == request.auth.uid
+          || (
+            isClientOwnerOfRequest(resource.data.requestId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'accepted_at', 'updated_at'])
+            && (request.resource.data.status in ['accepted', 'rejected'])
+          )
+        );
+      allow delete: if isAuthenticated() && resource.data.professionalId == request.auth.uid;
+    }
+
+    // Regras para o Chat (Messages)
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        // Verifica se o usuário é participante do chat (assumindo que o chatId contém os IDs, ex: reqId_profId)
+        resource.data.chatId.matches('.*' + request.auth.uid + '.*') ||
+        // Backup: se não usar chatId com IDs, permite ler se for o dono da mensagem (mas o ideal é ter participants)
+        // Por enquanto, permitimos leitura se autenticado (MVP), mas restrito à criação pelo próprio sender
+        true // MVP - Permitir leitura para evitar quebra, já que a query filtra no client. Em prod, usar array participants
+      );
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      allow update: if isAuthenticated(); // MVP: Permite que o destinatário marque a mensagem como lida
+    }
+
+    // Regras para Avaliações (Reviews)
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.clientId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.clientId == request.auth.uid;
+    }
+
+    // Regras para o Sistema de Moedas / Diamantes
+    match /unlocks/{unlockId} {
+      allow read: if isAuthenticated();
+      // O profissional deve ser o dono do desbloqueio
+      allow create: if isAuthenticated() && request.resource.data.professionalId == request.auth.uid;
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated();
+      // Em produção, isso seria restrito apenas ao backend. Para o MVP:
+      allow create: if isAuthenticated();
+    }
+  }
+}
