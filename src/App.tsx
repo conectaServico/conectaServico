@@ -37,6 +37,7 @@ import ProProposals from '@/professional/ProProposals';
 import Wallet from '@/professional/Wallet';
 import DocumentValidation from '@/professional/DocumentValidation';
 import AdminPanel from '@/admin/AdminPanel';
+import CategoryPage from '@/pages/CategoryPage';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -107,16 +108,15 @@ function App() {
           </div>
         )}
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/home" element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          } />
+          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/categoria/:slug" element={<CategoryPage />} />
+          <Route path="/help" element={<HelpCenter />} />
+          <Route path="/help/safety" element={<SafetyRules />} />
+          <Route path="/help/faqs" element={<AllFaqs />} />
           
           {/* Common Protected Routes */}
           <Route 
@@ -214,34 +214,10 @@ function App() {
             } 
           />
           <Route 
-            path="/help" 
-            element={
-              <ProtectedRoute>
-                <HelpCenter />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/help/contact" 
             element={
               <ProtectedRoute>
                 <ContactSupport />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/help/safety" 
-            element={
-              <ProtectedRoute>
-                <SafetyRules />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/help/faqs" 
-            element={
-              <ProtectedRoute>
-                <AllFaqs />
               </ProtectedRoute>
             } 
           />

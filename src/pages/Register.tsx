@@ -9,7 +9,7 @@ import { User, UserRole } from '@/types';
 import { maskCEP, maskPhone } from '@/utils/masks';
 import { CATEGORIES_MAP } from '@/utils/categories';
 
-const AVAILABLE_SERVICES = CATEGORIES_MAP['Reformas e Reparos'];
+const AVAILABLE_SERVICES = CATEGORIES_MAP['Construção e reformas'];
 
 const Register = () => {
   // Controle de Etapas
@@ -41,6 +41,10 @@ const Register = () => {
   
   const navigate = useNavigate();
   const setUser = useUserStore((state) => state.setUser);
+
+  // Get redirect param if exists
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectPath = searchParams.get('redirect') || '/home';
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(maskPhone(e.target.value));
@@ -179,8 +183,14 @@ const Register = () => {
         });
       }
 
-      setUser(userData);
-      navigate('/');
+      // Verifica se há um redirect escondido no Session Storage
+      const pendingRedirect = sessionStorage.getItem('pendingRequestRedirect');
+      if (pendingRedirect) {
+        sessionStorage.removeItem('pendingRequestRedirect');
+        navigate(pendingRedirect);
+      } else {
+        navigate(redirectPath);
+      }
     } catch (err: any) {
       console.error("Erro no cadastro:", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -199,15 +209,17 @@ const Register = () => {
     <div className="min-h-[80vh] flex items-center justify-center py-12">
       <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-2xl border border-gray-100">
         <div className="flex flex-col items-center mb-8">
-          <img
-            src="/logo.jpg"
-            alt="Conecta Serviço Logo"
-            className="h-16 w-auto rounded-xl mb-4 shadow-sm"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = '/logo.png';
-            }}
-          />
+          <Link to="/">
+            <img
+              src="/logo.jpg"
+              alt="Conecta Serviço Logo"
+              className="h-16 w-auto rounded-xl mb-4 shadow-sm hover:scale-105 transition-transform"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/logo.png';
+              }}
+            />
+          </Link>
           <h1 className="text-3xl font-extrabold text-gray-900">Crie sua conta</h1>
           <p className="text-gray-500 text-center mt-2">Preencha seus dados para encontrar os melhores profissionais ou oferecer seus serviços.</p>
         </div>
@@ -502,7 +514,7 @@ const Register = () => {
 
         <p className="mt-8 text-center text-gray-600 font-medium">
           Já tem uma conta?{' '}
-          <Link to="/login" className="text-primary font-bold hover:underline">
+          <Link to={`/login?redirect=${encodeURIComponent(redirectPath)}`} className="text-primary font-bold hover:underline">
             Faça login
           </Link>
         </p>

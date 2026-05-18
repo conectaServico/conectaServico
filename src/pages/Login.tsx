@@ -18,6 +18,10 @@ const Login = () => {
   
   const navigate = useNavigate();
   const setUser = useUserStore((state) => state.setUser);
+  
+  // Get redirect param if exists
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectPath = searchParams.get('redirect') || '/home';
 
   useEffect(() => {
     const checkRedirect = async () => {
@@ -46,7 +50,7 @@ const Login = () => {
             await setDoc(userDocRef, newUserData);
             setUser(newUserData);
           }
-          navigate('/home');
+          navigate(redirectPath);
         }
       } catch (err: any) {
         console.error("Erro no retorno do login com Google:", err);
@@ -66,18 +70,33 @@ const Login = () => {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const uid = userCredential.user.uid;
+      
+      const userDoc = await getDoc(doc(db, 'users', uid));
       
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
         setUser(userData);
-        navigate('/home');
+
+        // Verifica se há um redirect escondido no Session Storage
+        const pendingRedirect = sessionStorage.getItem('pendingRequestRedirect');
+        if (pendingRedirect) {
+          sessionStorage.removeItem('pendingRequestRedirect');
+          navigate(pendingRedirect);
+        } else {
+          // Fallback para redirect normal ou home
+          navigate(redirectPath);
+        }
       } else {
         setError('Usuário não encontrado no banco de dados.');
       }
     } catch (err: any) {
       console.error("Erro no login:", err);
-      setError('Falha no login. Verifique se o e-mail e a senha estão corretos.');
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('E-mail ou senha incorretos.');
+      } else {
+        setError('Falha ao fazer login. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -115,7 +134,7 @@ const Login = () => {
             await setDoc(userDocRef, newUserData);
             setUser(newUserData);
           }
-          navigate('/home');
+          navigate(redirectPath);
         }
       } else {
         const provider = new GoogleAuthProvider();
@@ -132,15 +151,17 @@ const Login = () => {
     <div className="min-h-[85vh] flex flex-col justify-center max-w-md mx-auto px-4 sm:px-6">
       {/* Logo Area */}
       <div className="flex flex-col items-center mb-8">
-        <img
-          src="/logo.jpg"
-          alt="Conecta Serviço Logo"
-          className="h-28 w-auto mb-4 drop-shadow-md"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = '/logo.png';
-          }}
-        />
+        <Link to="/">
+          <img
+            src="/logo.jpg"
+            alt="Conecta Serviço Logo"
+            className="h-28 w-auto mb-4 drop-shadow-md hover:scale-105 transition-transform"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/logo.png';
+            }}
+          />
+        </Link>
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Conecta Serviço</h1>
         <p className="text-slate-500 mt-2 text-center text-lg">Encontre o profissional ideal para a sua casa</p>
       </div>
@@ -234,7 +255,7 @@ const Login = () => {
 
         <p className="mt-8 text-center text-slate-600 font-medium">
           Ainda não tem conta?{' '}
-          <Link to="/register" className="text-secondary font-bold hover:underline">
+          <Link to={`/register?redirect=${encodeURIComponent(redirectPath)}`} className="text-secondary font-bold hover:underline">
             Cadastre-se
           </Link>
         </p>

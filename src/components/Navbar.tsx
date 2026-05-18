@@ -7,47 +7,13 @@ import {
   Home, 
   ClipboardList, 
   Bell, 
-  Search, 
-  MapPin, 
   ChevronDown,
-  LogOut,
-  Settings,
   Diamond,
   Plus
 } from 'lucide-react';
 import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
-
-const BRAZIL_STATES = [
-  { value: '', label: 'Brasil' },
-  { value: 'AC', label: 'AC' },
-  { value: 'AL', label: 'AL' },
-  { value: 'AP', label: 'AP' },
-  { value: 'AM', label: 'AM' },
-  { value: 'BA', label: 'BA' },
-  { value: 'CE', label: 'CE' },
-  { value: 'DF', label: 'DF' },
-  { value: 'ES', label: 'ES' },
-  { value: 'GO', label: 'GO' },
-  { value: 'MA', label: 'MA' },
-  { value: 'MT', label: 'MT' },
-  { value: 'MS', label: 'MS' },
-  { value: 'MG', label: 'MG' },
-  { value: 'PA', label: 'PA' },
-  { value: 'PB', label: 'PB' },
-  { value: 'PR', label: 'PR' },
-  { value: 'PE', label: 'PE' },
-  { value: 'PI', label: 'PI' },
-  { value: 'RJ', label: 'RJ' },
-  { value: 'RN', label: 'RN' },
-  { value: 'RS', label: 'RS' },
-  { value: 'RO', label: 'RO' },
-  { value: 'RR', label: 'RR' },
-  { value: 'SC', label: 'SC' },
-  { value: 'SP', label: 'SP' },
-  { value: 'SE', label: 'SE' },
-  { value: 'TO', label: 'TO' }
-];
+import { CATEGORY_MENUS } from '@/utils/categories';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useUserStore();
@@ -57,12 +23,11 @@ const Navbar = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const hasUnread = useUnreadMessages();
 
-  // Search States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchLocation, setSearchLocation] = useState(user?.state || '');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -72,6 +37,9 @@ const Navbar = () => {
       }
       if (notifMenuRef.current && !notifMenuRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
+      }
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
+        setActiveCategory(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -85,17 +53,6 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim() || searchLocation.trim() || searchLocation === '') {
-      if (user?.role === 'professional') {
-        navigate(`/home?q=${encodeURIComponent(searchQuery)}&city=${encodeURIComponent(searchLocation)}`);
-      } else {
-        navigate(`/home?q=${encodeURIComponent(searchQuery)}&city=${encodeURIComponent(searchLocation)}`);
-      }
-    }
-  };
-
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -106,51 +63,25 @@ const Navbar = () => {
         <div className="container mx-auto px-4 h-[72px] flex items-center justify-between gap-6">
           
           {/* Logo */}
-          <Link to="/home" className="flex items-center gap-2 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0">
             <img
               src="/logo.jpg"
-              alt="Conecta Serviço"
+              alt="Conecta Serviço Logo"
               className="h-10 w-auto rounded-lg"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 e.currentTarget.src = '/logo.png';
               }}
             />
+            <span className="text-2xl font-extrabold text-blue-950 tracking-tight hidden sm:block">
+              Conecta Serviço
+            </span>
           </Link>
 
-          {/* Search Bar (Both Roles) */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-3xl flex h-12 bg-slate-100 hover:bg-slate-200/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 transition-all rounded-full border border-slate-200 overflow-hidden items-center px-1">
-            <input
-              type="text"
-              placeholder={user?.role === 'client' ? "Buscar serviços..." : "Buscar serviços..."}
-              className="flex-1 bg-transparent border-none outline-none px-4 text-slate-800 placeholder-slate-500 h-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="h-6 w-px bg-slate-300 mx-2"></div>
-
-            <div className="flex items-center text-slate-600 px-2 cursor-pointer hover:text-slate-900 h-full max-w-[150px] group">
-              <MapPin className="w-5 h-5 mr-1.5 flex-shrink-0 group-hover:text-primary transition-colors" />
-              <select 
-                className="bg-transparent border-none outline-none w-full text-sm font-medium text-slate-700 cursor-pointer appearance-none group-hover:text-primary transition-colors"
-                value={searchLocation}
-                onChange={(e) => setSearchLocation(e.target.value)}
-              >
-                <option value="">Brasil</option>
-                {BRAZIL_STATES.map((state) => (
-                  <option key={state.value} value={state.value}>{state.label}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 ml-1 flex-shrink-0" />
-            </div>
-
-            <button type="submit" className="bg-slate-900 text-white p-2.5 rounded-full ml-1 hover:bg-slate-800 transition-colors h-10 w-10 flex items-center justify-center flex-shrink-0">
-              <Search className="w-5 h-5" />
-            </button>
-          </form>
+          <div className="flex-1 max-w-3xl"></div>
 
           {/* Action Icons & User Menu */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-6 flex-shrink-0">
             {isAuthenticated ? (
               <>
                 {/* Plano Profissional / Carteira */}
@@ -334,15 +265,69 @@ const Navbar = () => {
                 )}
               </>
             ) : (
-              <div className="flex items-center gap-4">
-                <Link to="/login" className="text-slate-600 hover:text-primary font-bold">Entrar</Link>
-                <Link to="/register" className="bg-primary text-white px-5 py-2.5 rounded-full font-bold hover:bg-primary-hover transition-colors shadow-sm">
-                  Criar conta
+              <div className="flex items-center gap-6">
+                <Link to="/register" className="text-slate-600 hover:text-primary font-bold text-sm">Seja um profissional</Link>
+                <Link to="/help" className="text-slate-600 hover:text-primary font-bold text-sm">Como funciona?</Link>
+                <Link to="/help/safety" className="text-slate-600 hover:text-primary font-bold text-sm">Segurança</Link>
+                <div className="w-px h-6 bg-slate-200"></div>
+                <Link to="/login" className="flex items-center gap-2 text-primary font-bold hover:bg-primary/5 px-4 py-2 rounded-full transition-colors">
+                  <User className="w-5 h-5" />
+                  Entrar
                 </Link>
               </div>
             )}
           </div>
         </div>
+
+        {/* Desktop Categories Menu - OLX / GetNinjas Style */}
+        {(!isAuthenticated || user?.role !== 'client') && (
+          <div className="border-t border-slate-100 bg-white" ref={categoryMenuRef}>
+            <div className="container mx-auto max-w-5xl px-4 relative">
+              <div className="flex justify-between items-center overflow-x-auto hide-scrollbar">
+                {CATEGORY_MENUS.map((cat) => (
+                  <Link
+                    key={cat.name}
+                    to={`/categoria/${cat.slug}`}
+                    className={`flex flex-col items-center gap-2 py-4 px-4 min-w-[100px] border-b-2 transition-all ${
+                      activeCategory === cat.name 
+                        ? 'border-primary text-primary bg-primary/5' 
+                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                    onMouseEnter={() => setActiveCategory(cat.name)}
+                  >
+                    <cat.icon className={`w-6 h-6 ${activeCategory === cat.name ? 'text-primary' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold text-center leading-tight">{cat.name}</span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Mega Menu Dropdown */}
+              {activeCategory && (
+                <div 
+                  className="absolute left-0 right-0 top-full bg-white shadow-xl border-x border-b border-slate-200 rounded-b-2xl p-8 z-50 animate-in fade-in slide-in-from-top-2"
+                  onMouseLeave={() => setActiveCategory(null)}
+                >
+                  <div className="grid grid-cols-4 gap-8">
+                    {CATEGORY_MENUS.find(c => c.name === activeCategory)?.items.map((item) => {
+                      const category = CATEGORY_MENUS.find(c => c.name === activeCategory);
+                      return (
+                        <Link
+                        key={item}
+                        to={`/categoria/${CATEGORY_MENUS.find(c => c.name === activeCategory)?.slug}?servico=${encodeURIComponent(item)}`}
+                        className="text-sm text-slate-500 hover:text-primary transition-colors"
+                        onClick={() => setActiveCategory(null)}
+                      >
+                          <ChevronDown className="w-3 h-3 -rotate-90 text-slate-300" />
+                          {item}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
       )}
 
@@ -350,15 +335,13 @@ const Navbar = () => {
       {!isActive('/login') && !isActive('/register') && (
       <nav className="md:hidden bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
         <div className="px-4 h-14 flex items-center justify-between">
-          <Link to="/home" className="text-xl font-bold text-primary flex items-center gap-2 truncate">
-            <img src="/logo.jpg" alt="Logo" className="h-8 w-auto" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }} />
+          <Link to="/" className="text-lg font-extrabold text-blue-950 flex items-center gap-2 truncate">
+            <img src="/logo.jpg" alt="Logo" className="h-8 w-auto rounded-md" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }} />
+            Conecta Serviço
           </Link>
           
           {isAuthenticated ? (
              <div className="flex items-center gap-3">
-               <button onClick={() => navigate('/home')} className="text-slate-600 p-2">
-                 <Search className="w-6 h-6" />
-               </button>
                {user?.role === 'client' && (
                  <Link to="/request/new" className="bg-orange-500 text-white p-2 rounded-full">
                    <Plus className="w-5 h-5" />
@@ -369,36 +352,6 @@ const Navbar = () => {
             <Link to="/login" className="text-sm font-bold text-primary">Entrar</Link>
           )}
         </div>
-        
-        {/* Mobile Search Bar Below Header */}
-        <div className="px-4 pb-3 bg-white">
-          <form onSubmit={handleSearch} className="flex bg-slate-100 rounded-full items-center px-3 h-10 border border-slate-200">
-            <Search className="w-4 h-4 text-slate-400 mr-2 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder={user?.role === 'client' ? "Buscar serviços..." : "Buscar serviços..."}
-              className="bg-transparent border-none outline-none flex-1 text-sm text-slate-800 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="h-4 w-px bg-slate-300 mx-2"></div>
-
-              <div className="flex items-center cursor-pointer group">
-                <MapPin className="w-4 h-4 text-slate-400 mr-1 flex-shrink-0 group-hover:text-primary transition-colors" />
-                <select 
-                  className="bg-transparent border-none outline-none w-16 text-sm font-medium text-slate-700 cursor-pointer appearance-none group-hover:text-primary transition-colors"
-                  value={searchLocation}
-                  onChange={(e) => setSearchLocation(e.target.value)}
-                >
-                  <option value="">Brasil</option>
-                  {BRAZIL_STATES.map((state) => (
-                    <option key={state.value} value={state.value}>{state.label}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3 h-3 ml-0.5 text-slate-400 flex-shrink-0" />
-              </div>
-            </form>
-          </div>
       </nav>
       )}
 

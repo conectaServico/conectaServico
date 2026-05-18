@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import Navbar from './Navbar';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
 
@@ -10,6 +10,9 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { isAuthenticated } = useUserStore();
+  const location = useLocation();
+
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${isAuthenticated ? 'pb-16 md:pb-0' : ''}`}>
@@ -18,8 +21,8 @@ const Layout = ({ children }: LayoutProps) => {
         {children}
       </main>
       
-      {/* Footer Profissional - Oculto para usuários logados */}
-      {!isAuthenticated && (
+      {/* Footer Profissional - Oculto para usuários logados e nas páginas de auth */}
+      {!isAuthenticated && !isAuthPage && (
         <footer className="bg-slate-900 pt-16 pb-8 border-t border-slate-800">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
