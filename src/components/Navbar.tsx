@@ -60,7 +60,8 @@ const Navbar = () => {
       {/* Desktop Navigation - OLX Style */}
       {!isActive('/login') && !isActive('/register') && (
       <nav className="hidden md:block bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-[72px] flex items-center justify-between gap-6">
+        {/* Main Header */}
+        <div className="flex items-center justify-between h-20 px-4 max-w-7xl mx-auto">
           
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 flex-shrink-0">
@@ -280,7 +281,7 @@ const Navbar = () => {
         </div>
 
         {/* Desktop Categories Menu - OLX / GetNinjas Style */}
-        {(!isAuthenticated || user?.role !== 'client') && (
+        {(!user || user.type === 'client') && (
           <div className="border-t border-slate-100 bg-white" ref={categoryMenuRef}>
             <div className="container mx-auto max-w-5xl px-4 relative">
               <div className="flex justify-between items-center overflow-x-auto hide-scrollbar">

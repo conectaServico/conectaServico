@@ -67,6 +67,10 @@ const NewJob = () => {
     }
   };
 
+  const needsAreaSize = ['Construção e reformas', 'Limpeza e manutenção'].includes(category);
+  const needsPropertyType = ['Construção e reformas', 'Limpeza e manutenção', 'Serviços gerais'].includes(category);
+  const needsBlueprint = category === 'Construção e reformas';
+
   const nextStep = () => {
     setError('');
     if (step === 1) {
@@ -74,15 +78,15 @@ const NewJob = () => {
         setError('Por favor, selecione o serviço específico.');
         return;
       }
-      if (!areaSize || Number(areaSize) <= 0) {
+      if (needsAreaSize && (!areaSize || Number(areaSize) <= 0)) {
         setError('Por favor, informe uma estimativa válida do tamanho do espaço (m²).');
         return;
       }
-      if (hasBlueprint === null) {
+      if (needsBlueprint && hasBlueprint === null) {
         setError('Por favor, informe se você possui a planta do projeto.');
         return;
       }
-      if (!propertyType) {
+      if (needsPropertyType && !propertyType) {
         setError('Por favor, selecione o tipo de imóvel.');
         return;
       }
@@ -107,6 +111,8 @@ const NewJob = () => {
       // Save to Firestore
       const requestData: Omit<ServiceRequest, 'id'> = {
         clientId: user.id,
+        clientName: user.name,
+        clientPhone: user.phone,
         category,
         subcategory,
         propertyType,
@@ -219,23 +225,25 @@ const NewJob = () => {
               </div>
             )}
 
-            <div>
-              <label className="block text-base font-bold text-slate-800 mb-3">Tamanho do espaço (m²)</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full p-3.5 pr-12 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="Ex: 50"
-                  value={areaSize}
-                  onChange={(e) => setAreaSize(e.target.value)}
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold bg-slate-50 pl-2 pointer-events-none">m²</span>
+            {needsAreaSize && (
+              <div>
+                <label className="block text-base font-bold text-slate-800 mb-3">Tamanho do espaço (m²)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full p-3.5 pr-12 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="Ex: 50"
+                    value={areaSize}
+                    onChange={(e) => setAreaSize(e.target.value)}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold bg-slate-50 pl-2 pointer-events-none">m²</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">Estimativa do tamanho do local ou da área do serviço.</p>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Estimativa do tamanho do local ou da área do serviço.</p>
-            </div>
+            )}
 
-            {category === 'Reformas e Reparos' && (
+            {needsBlueprint && (
               <div>
                 <label className="block text-base font-bold text-slate-800 mb-2">Você possui a planta do projeto?</label>
                 <div className="flex gap-4">
@@ -263,23 +271,25 @@ const NewJob = () => {
               </div>
             )}
 
-            <div>
-              <label className="block text-base font-bold text-slate-800 mb-2">Qual o tipo de imóvel?</label>
-              <div className="grid grid-cols-2 gap-3">
-                {PROPERTY_TYPES.map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setPropertyType(type)}
-                    className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer ${
-                      propertyType === type ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
+            {needsPropertyType && (
+              <div>
+                <label className="block text-base font-bold text-slate-800 mb-2">Qual o tipo de imóvel?</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PROPERTY_TYPES.map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setPropertyType(type)}
+                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer ${
+                        propertyType === type ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-base font-bold text-slate-800 mb-3">Qual a urgência?</label>

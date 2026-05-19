@@ -32,6 +32,8 @@ export type MaterialOption = 'O profissional fornece' | 'Eu fornecerei' | 'A com
 export interface ServiceRequest {
   id: string;
   clientId: string;
+  clientName?: string;
+  clientPhone?: string;
   category: string;
   subcategory?: string;
   propertyType: string;
