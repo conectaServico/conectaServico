@@ -29,6 +29,21 @@ const Home = () => {
 
   return (
     <div className="space-y-20 pb-10">
+      {/* Resultados da busca e estado logado vs não logado da barra */}
+      {q && (
+        <section className="container mx-auto max-w-7xl px-4 pt-10">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">
+            Resultados para "{q}"
+          </h2>
+          <div className="bg-white p-8 rounded-2xl shadow-sm text-center border border-slate-100">
+            <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 text-lg">
+              Desculpe, a busca está sendo aprimorada no momento. Por favor, utilize as categorias acima.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Hero Section */}
       {!q && (
         <section className="relative overflow-hidden mt-4">
@@ -157,12 +172,12 @@ const Home = () => {
                 </Link>
 
                 {/* Card 4 - Assistência Técnica */}
-                <Link to="/categoria/assistencia-tecnica?servico=Celular" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
+                <Link to="/categoria/assistencia-tecnica?servico=Ar%20condicionado" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
                   <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-6 group-hover:scale-110 transition-transform">
-                    <MonitorSmartphone className="w-7 h-7" />
+                    <Wrench className="w-7 h-7" />
                   </div>
                   <p className="text-blue-500 font-medium text-sm mb-2">Assistência técnica</p>
-                  <h3 className="text-xl font-bold text-blue-950 mb-6 group-hover:text-blue-600 transition-colors">Conserto de Celular</h3>
+                  <h3 className="text-xl font-bold text-blue-950 mb-6 group-hover:text-blue-600 transition-colors">Conserto de Ar Condicionado</h3>
                   
                   <div className="space-y-3">
                     <p className="text-xs text-slate-500">Avaliação do cliente</p>

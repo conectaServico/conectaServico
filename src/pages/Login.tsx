@@ -50,7 +50,16 @@ const Login = () => {
             await setDoc(userDocRef, newUserData);
             setUser(newUserData);
           }
-          navigate(redirectPath);
+          
+          // Verifica se há um redirect escondido no Session Storage
+          const pendingRedirect = sessionStorage.getItem('pendingRequestRedirect');
+          if (pendingRedirect) {
+            sessionStorage.removeItem('pendingRequestRedirect');
+            navigate(pendingRedirect);
+          } else {
+            // Fallback para redirect normal ou home
+            navigate(redirectPath);
+          }
         }
       } catch (err: any) {
         console.error("Erro no retorno do login com Google:", err);
@@ -134,7 +143,16 @@ const Login = () => {
             await setDoc(userDocRef, newUserData);
             setUser(newUserData);
           }
-          navigate(redirectPath);
+
+          // Verifica se há um redirect escondido no Session Storage
+          const pendingRedirect = sessionStorage.getItem('pendingRequestRedirect');
+          if (pendingRedirect) {
+            sessionStorage.removeItem('pendingRequestRedirect');
+            navigate(pendingRedirect);
+          } else {
+            // Fallback para redirect normal ou home
+            navigate(redirectPath);
+          }
         }
       } else {
         const provider = new GoogleAuthProvider();

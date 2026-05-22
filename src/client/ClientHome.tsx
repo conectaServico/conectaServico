@@ -7,17 +7,17 @@ const ClientHome = () => {
   const navigate = useNavigate();
 
   const categories = [
-    { name: 'Pedreiros', icon: Hammer, color: 'bg-orange-100 text-orange-600' },
-    { name: 'Eletricistas', icon: Zap, color: 'bg-yellow-100 text-yellow-600' },
-    { name: 'Encanadores', icon: Droplets, color: 'bg-blue-100 text-blue-600' },
-    { name: 'Gesseiros', icon: PenTool, color: 'bg-indigo-100 text-indigo-600' },
-    { name: 'Marido de Aluguel', icon: Wrench, color: 'bg-emerald-100 text-emerald-600' },
-    { name: 'Reformas', icon: Wrench, color: 'bg-rose-100 text-rose-600' }
+    { name: 'Pedreiro', icon: Hammer, color: 'bg-orange-100 text-orange-600', label: 'Pedreiros' },
+    { name: 'Eletricista', icon: Zap, color: 'bg-yellow-100 text-yellow-600', label: 'Eletricistas' },
+    { name: 'Encanador', icon: Droplets, color: 'bg-blue-100 text-blue-600', label: 'Encanadores' },
+    { name: 'Gesseiro', icon: PenTool, color: 'bg-indigo-100 text-indigo-600', label: 'Gesseiros' },
+    { name: 'Marido de aluguel', icon: Wrench, color: 'bg-emerald-100 text-emerald-600', label: 'Marido de Aluguel' },
+    { name: 'Reformas', icon: Wrench, color: 'bg-rose-100 text-rose-600', label: 'Reformas' }
   ];
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      navigate(`/search?q=${e.currentTarget.value}`);
+    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+      navigate(`/?q=${encodeURIComponent(e.currentTarget.value.trim())}`);
     }
   };
 
@@ -25,7 +25,7 @@ const ClientHome = () => {
     <div className="pb-24">
       {/* Header Profile */}
       <div className="bg-primary pt-8 pb-6 px-4 rounded-b-3xl shadow-md text-white">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div>
             <p className="text-primary-100 text-sm font-medium">Bem-vindo(a) de volta,</p>
             <h1 className="text-2xl font-bold">{user?.name?.split(' ')[0]}</h1>
@@ -37,19 +37,6 @@ const ClientHome = () => {
               <span className="text-xl font-bold">{user?.name?.charAt(0)}</span>
             )}
           </Link>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-slate-400" />
-          </div>
-          <input
-            type="text"
-            onKeyDown={handleSearch}
-            className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white text-slate-900 placeholder-slate-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-100 transition-all text-sm"
-            placeholder="O que você precisa hoje?"
-          />
         </div>
       </div>
 
@@ -78,11 +65,11 @@ const ClientHome = () => {
           </div>
           <div className="grid grid-cols-3 gap-4">
             {categories.map((cat, idx) => (
-              <Link to={`/request/new?category=Reformas e Reparos&subcategory=${cat.name}`} key={idx} className="flex flex-col items-center gap-2">
+              <Link to={cat.name === 'Marido de aluguel' ? `/categoria/servicos-gerais?servico=${cat.name}` : cat.name === 'Reformas' ? `/categoria/construcao-e-reformas` : `/categoria/construcao-e-reformas?servico=${cat.name}`} key={idx} className="flex flex-col items-center gap-2">
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm ${cat.color}`}>
                   <cat.icon className="w-7 h-7" />
                 </div>
-                <span className="text-xs text-center font-medium text-slate-600 leading-tight">{cat.name}</span>
+                <span className="text-xs text-center font-medium text-slate-600 leading-tight">{cat.label}</span>
               </Link>
             ))}
           </div>

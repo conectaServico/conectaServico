@@ -8,6 +8,7 @@ import { maskPhone, maskCEP } from '@/utils/masks';
 import { Review } from '@/types';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import * as faceapi from 'face-api.js';
 
 const Profile = () => {
   const { user, setUser } = useUserStore();
@@ -23,6 +24,7 @@ const Profile = () => {
 
   const [loading, setLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [faceLoading, setFaceLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -37,6 +39,18 @@ const Profile = () => {
     const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
     return { count: reviews.length, avg: sum / reviews.length };
   }, [reviews]);
+
+  useEffect(() => {
+    // Carregar os modelos do face-api.js quando o componente for montado
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+      } catch (err) {
+        console.error("Erro ao carregar modelos do face-api:", err);
+      }
+    };
+    loadModels();
+  }, []);
 
   useEffect(() => {
     if (!user?.id || user.role !== 'professional') return;
@@ -79,11 +93,51 @@ const Profile = () => {
     }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
+      
+      // Criar URL provisória para exibir a imagem e processar na IA
+      const imageUrl = URL.createObjectURL(file);
+      
+      if (user?.role === 'professional') {
+        setFaceLoading(true);
+        try {
+          // Criar elemento de imagem em memória
+          const img = document.createElement('img');
+          img.src = imageUrl;
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+
+          // Detectar rostos usando o modelo ssdMobilenetv1 (mais preciso que o tiny)
+          const detections = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }));
+          
+          if (detections.length === 0) {
+            toast.error("Nenhum rosto humano detectado. Por favor, envie uma foto nítida do seu rosto.");
+            setFaceLoading(false);
+            return;
+          }
+          
+          if (detections.length > 1) {
+            toast.error("Mais de um rosto detectado. A foto de perfil deve ser apenas sua.");
+            setFaceLoading(false);
+            return;
+          }
+          
+          toast.success("Rosto validado com sucesso!");
+        } catch (err) {
+          console.error("Erro na detecção facial:", err);
+          // Em caso de erro na IA, permitimos o upload mas avisamos
+          toast.error("Não foi possível validar o rosto automaticamente, mas a foto será enviada para análise.");
+        }
+        setFaceLoading(false);
+      }
+
       setPhoto(file);
-      setPreview(URL.createObjectURL(file));
+      setPreview(imageUrl);
     }
   };
 
@@ -91,6 +145,11 @@ const Profile = () => {
     setPhoto(null);
     setPreview('');
     setShowPhotoMenu(false);
+    
+    // Limpar o input file para permitir selecionar o mesmo arquivo novamente
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -359,7 +418,12 @@ const Profile = () => {
           <div className="relative group flex flex-col items-center gap-3">
             <div className="relative">
               <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-100 bg-slate-50 flex items-center justify-center">
-                {preview ? (
+                {faceLoading ? (
+                  <div className="flex flex-col items-center justify-center text-primary">
+                    <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                    <span className="text-xs font-bold text-center px-2">Validando Rosto...</span>
+                  </div>
+                ) : preview ? (
                   <img src={preview} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <UserIcon className="w-12 h-12 text-slate-300" />
@@ -368,8 +432,9 @@ const Profile = () => {
               
               <button 
                 type="button"
+                disabled={faceLoading}
                 onClick={() => setShowPhotoMenu(!showPhotoMenu)}
-                className="absolute bottom-0 right-0 bg-primary text-white p-2.5 rounded-full shadow-lg hover:bg-primary-hover transition-all border-2 border-white z-10"
+                className="absolute bottom-0 right-0 bg-primary text-white p-2.5 rounded-full shadow-lg hover:bg-primary-hover transition-all border-2 border-white z-10 disabled:opacity-50"
               >
                 <Camera className="w-5 h-5" />
               </button>
