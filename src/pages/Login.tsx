@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
@@ -24,44 +24,9 @@ const Login = () => {
   const redirectPath = searchParams.get('redirect') || '/home';
 
   useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        setGoogleLoading(true);
-        const result = await getRedirectResult(auth);
-        if (result) {
-          const user = result.user;
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (userDoc.exists()) {
-            setUser(userDoc.data() as User);
-          } else {
-            const newUserData: User = {
-              id: user.uid,
-              name: user.displayName || 'Usuário',
-              email: user.email || '',
-              role: 'client',
-              phone: '',
-              city: '',
-              photo_url: user.photoURL || undefined,
-              verified: false,
-              created_at: Date.now(),
-            };
-            await setDoc(userDocRef, newUserData);
-            setUser(newUserData);
-          }
-          navigate(redirectPath);
-        }
-      } catch (err: any) {
-        console.error("Erro no retorno do login com Google:", err);
-        setError('Falha ao concluir login com o Google.');
-      } finally {
-        setGoogleLoading(false);
-      }
-    };
-
-    checkRedirect();
-  }, [navigate, setUser]);
+    // A verificação de redirect não é mais necessária com signInWithPopup no web
+    // mas a mantemos comentada ou removida para evitar erros se sobrar cache
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,38 +77,51 @@ const Login = () => {
         if (result.credential?.idToken) {
           const credential = GoogleAuthProvider.credential(result.credential.idToken);
           const userCredential = await signInWithCredential(auth, credential);
-          const user = userCredential.user;
-
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (userDoc.exists()) {
-            setUser(userDoc.data() as User);
-          } else {
-            const newUserData: User = {
-              id: user.uid,
-              name: user.displayName || 'Usuário',
-              email: user.email || '',
-              role: 'client',
-              phone: '',
-              city: '',
-              photo_url: user.photoURL || undefined,
-              verified: false,
-              created_at: Date.now(),
-            };
-            await setDoc(userDocRef, newUserData);
-            setUser(newUserData);
-          }
-          navigate(redirectPath);
+          await processGoogleUser(userCredential.user);
         }
       } else {
         const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
+        const userCredential = await signInWithPopup(auth, provider);
+        await processGoogleUser(userCredential.user);
       }
     } catch (err: any) {
       console.error("Erro no login com Google:", err);
-      setError('Falha ao tentar entrar com o Google.');
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setError('Falha ao tentar entrar com o Google.');
+      }
       setGoogleLoading(false);
+    }
+  };
+
+  const processGoogleUser = async (user: any) => {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (userDoc.exists()) {
+      setUser(userDoc.data() as User);
+    } else {
+      const newUserData: User = {
+        id: user.uid,
+        name: user.displayName || 'Usuário',
+        email: user.email || '',
+        role: 'client',
+        phone: '',
+        city: '',
+        photo_url: user.photoURL || undefined,
+        verified: false,
+        created_at: Date.now(),
+      };
+      await setDoc(userDocRef, newUserData);
+      setUser(newUserData);
+    }
+    
+    // Verifica se há um redirect escondido no Session Storage
+    const pendingRedirect = sessionStorage.getItem('pendingRequestRedirect');
+    if (pendingRedirect) {
+      sessionStorage.removeItem('pendingRequestRedirect');
+      navigate(pendingRedirect);
+    } else {
+      navigate(redirectPath);
     }
   };
 
