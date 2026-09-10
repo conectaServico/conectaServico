@@ -21,6 +21,15 @@ const ProHome = () => {
   // Filtros
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [currentBanner, setCurrentBanner] = useState(0);
+
+  // Auto-rotate carousel
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentBanner((prev) => (prev + 1) % 3);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const fetchAvailableJobs = async () => {
@@ -84,27 +93,8 @@ const ProHome = () => {
 
   return (
     <div className="bg-slate-50 min-h-screen pb-20">
-      {/* Mobile-first Header */}
-      <div className="bg-white px-4 py-4 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <button className="text-slate-700 p-1">
-            <Menu className="w-6 h-6" />
-          </button>
-          <span className="text-xl font-medium text-slate-800">Menu</span>
-        </div>
-        
-        <Link to="/wallet" className="flex items-center gap-2 bg-yellow-100/80 hover:bg-yellow-100 px-3 py-1.5 rounded-full transition-colors cursor-pointer border border-yellow-200/50">
-          <div className="bg-yellow-400 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
-            <span className="text-yellow-900 text-xs font-bold">💎</span>
-          </div>
-          <span className="font-bold text-slate-700">{user?.coinsBalance || 0}</span>
-          <span className="text-sm font-medium text-slate-600 hidden sm:inline">Diamantes</span>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
-        </Link>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white flex w-full border-b border-slate-200">
+        {/* Tabs */}
+        <div className="bg-white flex w-full border-b border-slate-200">
         <div className="flex-1 flex justify-center py-4 border-b-2 border-yellow-400">
           <span className="text-sm font-bold text-slate-800 tracking-wide uppercase">Disponíveis</span>
         </div>
@@ -114,31 +104,66 @@ const ProHome = () => {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 pt-6 pb-12">
-        {/* Modern Banner */}
+        {/* Modern Banners Carousel */}
         <div className="mb-8">
-          <div className="bg-gradient-to-r from-yellow-300 to-yellow-400 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm relative overflow-hidden">
-            <div className="relative z-10">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-yellow-950 mb-1 leading-tight">
-                Convide colegas<br />profissionais e<br />ganhe 100 diamantes!
-              </h2>
-            </div>
-            {/* Banner Image Placeholder */}
-            <div className="w-32 h-32 bg-yellow-200 rounded-full flex-shrink-0 relative z-10 flex items-center justify-center overflow-hidden border-4 border-yellow-300">
-              <div className="flex gap-2">
-                <div className="w-8 h-16 bg-blue-600 rounded-lg transform -rotate-12 translate-y-4"></div>
-                <div className="w-8 h-16 bg-slate-800 rounded-lg transform rotate-12"></div>
+          <div className="relative overflow-hidden rounded-2xl shadow-sm">
+            <div 
+              className="flex transition-transform duration-500 ease-in-out" 
+              style={{ transform: `translateX(-${currentBanner * 100}%)` }}
+            >
+              {/* Banner 1 */}
+              <div className="w-full flex-shrink-0 bg-gradient-to-r from-yellow-300 to-yellow-400 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-yellow-950 mb-1 leading-tight">
+                    Convide colegas<br />profissionais e<br />ganhe 100 diamantes!
+                  </h2>
+                </div>
+                <div className="w-28 h-28 sm:w-32 sm:h-32 bg-yellow-200 rounded-full flex-shrink-0 relative z-10 flex items-center justify-center overflow-hidden border-4 border-yellow-300">
+                  <div className="flex gap-2">
+                    <div className="w-6 h-12 sm:w-8 sm:h-16 bg-blue-600 rounded-lg transform -rotate-12 translate-y-4"></div>
+                    <div className="w-6 h-12 sm:w-8 sm:h-16 bg-slate-800 rounded-lg transform rotate-12"></div>
+                  </div>
+                </div>
+                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
+              </div>
+
+              {/* Banner 2 */}
+              <div className="w-full flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-700 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-1 leading-tight">
+                    Mais segurança.<br />Aplicativo<br />100% confiável!
+                  </h2>
+                </div>
+                <div className="w-28 h-28 sm:w-32 sm:h-32 bg-blue-400 rounded-full flex-shrink-0 relative z-10 flex items-center justify-center overflow-hidden border-4 border-blue-300">
+                  <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-white" />
+                </div>
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
+              </div>
+
+              {/* Banner 3 */}
+              <div className="w-full flex-shrink-0 bg-gradient-to-r from-emerald-400 to-emerald-600 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-1 leading-tight">
+                    Super Promoção<br />Compre diamantes<br />com até 50% OFF
+                  </h2>
+                </div>
+                <div className="w-28 h-28 sm:w-32 sm:h-32 bg-emerald-300 rounded-full flex-shrink-0 relative z-10 flex items-center justify-center overflow-hidden border-4 border-emerald-200">
+                  <span className="text-5xl sm:text-6xl">💎</span>
+                </div>
+                <div className="absolute -bottom-10 right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
               </div>
             </div>
-            
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
           </div>
           
-          <div className="flex justify-center gap-1.5 mt-4">
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+          <div className="flex justify-center gap-2 mt-4">
+            {[0, 1, 2].map((idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentBanner(idx)}
+                className={`w-2 h-2 rounded-full transition-all ${currentBanner === idx ? 'bg-primary w-4' : 'bg-slate-300'}`}
+                aria-label={`Ir para o banner ${idx + 1}`}
+              />
+            ))}
           </div>
         </div>
 
@@ -182,9 +207,16 @@ const ProHome = () => {
                       </div>
                       
                       <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-slate-400" />
+                        <span className="font-medium tracking-wide">
+                          {(job.clientPhone || '(11) 99999-9999').slice(0, -4)}xxxx
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-slate-400" />
                         <span className="font-medium">
-                          {job.neighborhood ? `A ${Math.floor(Math.random() * 15) + 1} km - ${job.neighborhood}` : 'Serviço online'}
+                          {job.neighborhood ? `${job.neighborhood}, ${job.city}` : 'Serviço online'}
                         </span>
                       </div>
                     </div>

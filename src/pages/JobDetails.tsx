@@ -645,36 +645,51 @@ const RequestDetails = () => {
           </div>
 
           {/* Map Header */}
-          <div className="h-32 bg-slate-200 relative w-full flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}></div>
-            <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2 shadow-sm border border-white z-10">
-              <Map className="w-4 h-4 text-slate-500" />
-              <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">Ver no mapa</span>
-            </div>
+          <div className="h-48 bg-slate-200 relative w-full flex items-center justify-center overflow-hidden">
+            <iframe
+              title="Mapa do Local"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              style={{ border: 0, position: 'absolute', inset: 0 }}
+              src={`https://www.google.com/maps?q=${encodeURIComponent(`${request.neighborhood}, ${request.city}, Brasil`)}&output=embed`}
+              allowFullScreen
+            ></iframe>
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${request.neighborhood}, ${request.city}, Brasil`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2 shadow-lg border border-white z-10 hover:bg-white transition-colors cursor-pointer"
+            >
+              <Map className="w-4 h-4 text-blue-500" />
+              <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">Abrir no Maps</span>
+            </a>
           </div>
 
           {/* Quick Info Tabs */}
           <div className="bg-white border-b border-slate-200 flex text-center">
-            <div className="flex-1 py-4 border-r border-slate-100 flex flex-col items-center justify-center">
+            <div className="flex-1 py-4 border-r border-slate-100 flex flex-col items-center justify-center px-1">
               <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mb-2">
                 <MapPin className="w-5 h-5 text-blue-500" />
               </div>
-              <span className="text-sm font-bold text-slate-800">A {Math.floor(Math.random() * 20) + 5} min</span>
-              <span className="text-xs text-slate-500">de você</span>
+              <span className="text-sm font-bold text-slate-800 line-clamp-1">{request.city}</span>
+              <span className="text-xs text-slate-500 line-clamp-1">{request.neighborhood}</span>
             </div>
-            <div className="flex-1 py-4 border-r border-slate-100 flex flex-col items-center justify-center">
+            <div className="flex-1 py-4 border-r border-slate-100 flex flex-col items-center justify-center px-1">
               <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center mb-2">
                 <Calendar className="w-5 h-5 text-amber-500" />
               </div>
-              <span className="text-sm font-bold text-slate-800">Próximos</span>
-              <span className="text-xs text-slate-500">dias</span>
+              <span className="text-sm font-bold text-slate-800 line-clamp-1">{request.urgency.split(' ')[0]}</span>
+              <span className="text-xs text-slate-500">Urgência</span>
             </div>
-            <div className="flex-1 py-4 flex flex-col items-center justify-center">
+            <div className="flex-1 py-4 flex flex-col items-center justify-center px-1">
               <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center mb-2">
-                <Info className="w-5 h-5 text-emerald-500" />
+                <Clock className="w-5 h-5 text-emerald-500" />
               </div>
-              <span className="text-sm font-bold text-slate-800">Informações</span>
-              <span className="text-xs text-slate-500">adicionais</span>
+              <span className="text-sm font-bold text-slate-800 line-clamp-1">
+                {formatDistanceToNow(request.created_at, { locale: ptBR })}
+              </span>
+              <span className="text-xs text-slate-500">atrás</span>
             </div>
           </div>
 
@@ -690,7 +705,7 @@ const RequestDetails = () => {
                 <MapPin className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div className="border-b border-slate-100 pb-6 flex-1">
                   <p className="font-bold text-slate-800">{request.neighborhood}, {request.city}</p>
-                  <p className="text-sm text-slate-500 mt-1">A {Math.floor(Math.random() * 15) + 1} km de você</p>
+                  <p className="text-sm text-slate-500 mt-1">Local do serviço</p>
                 </div>
               </div>
 
@@ -751,9 +766,11 @@ const RequestDetails = () => {
                   <div className="flex items-center gap-3 text-slate-600">
                     <Phone className="w-5 h-5" />
                     {hasUnlocked ? (
-                      <span className="font-medium text-slate-900">{clientPhone || '(11) 99999-9999'}</span>
+                      <span className="font-medium text-slate-900">{clientPhone || request.clientPhone || '(11) 99999-9999'}</span>
                     ) : (
-                      <span className="text-slate-400">Telefone oculto</span>
+                      <span className="text-slate-400 font-medium tracking-wide">
+                        {(clientPhone || request.clientPhone || '(11) 99999-9999').slice(0, -4)}xxxx
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-slate-600">
@@ -834,7 +851,7 @@ const RequestDetails = () => {
               <button
                 onClick={handleUnlockContact}
                 disabled={unlocking || (request.unlockCount || 0) >= 3}
-                className="flex-1 bg-[#10b981] hover:bg-[#059669] text-white h-14 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-70"
+                className="flex-1 bg-primary hover:bg-primary-hover text-white h-14 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-70"
               >
                 {unlocking ? (
                   <Loader2 className="w-6 h-6 animate-spin" />

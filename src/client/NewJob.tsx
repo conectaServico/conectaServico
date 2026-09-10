@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -26,6 +26,13 @@ const NewJob = () => {
   // Step 1
   const [category, setCategory] = useState(defaultCategory || MAIN_CATEGORIES[0]);
   const [subcategory, setSubcategory] = useState(defaultSubcategory || '');
+
+  // Reset category if accessed directly without category in URL
+  useEffect(() => {
+    if (!defaultCategory) {
+      setCategory('');
+    }
+  }, [defaultCategory]);
   const [propertyType, setPropertyType] = useState('');
   const [urgency, setUrgency] = useState<Urgency>('Média (Próximas semanas)');
   const [areaSize, setAreaSize] = useState('');
@@ -203,9 +210,47 @@ const NewJob = () => {
         {step === 1 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
             
+            {/* Se não tem categoria pré-selecionada, mostra a lista de categorias principais */}
+            {!category && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-base font-bold text-slate-800 mb-3">Qual a categoria do serviço?</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {MAIN_CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`p-4 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer text-left ${
+                        category === cat 
+                          ? 'border-primary bg-primary/5 text-primary' 
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {category && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-base font-bold text-slate-800 mb-3">Qual serviço você precisa?</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-base font-bold text-slate-800">
+                    {!defaultCategory ? `Qual serviço de ${category} você precisa?` : 'Qual serviço você precisa?'}
+                  </label>
+                  {!defaultCategory && (
+                    <button 
+                      onClick={() => {
+                        setCategory('');
+                        setSubcategory('');
+                      }}
+                      className="text-xs font-bold text-primary hover:underline"
+                    >
+                      Trocar categoria
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {CATEGORIES_MAP[category]?.map(sub => (
                     <button

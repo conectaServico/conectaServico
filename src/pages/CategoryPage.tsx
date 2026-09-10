@@ -12,13 +12,32 @@ const CategoryPage = () => {
   
   const category = CATEGORY_MENUS.find(c => c.slug === slug);
 
+  // Redireciona usuários logados diretamente para a tela de novo pedido
+  // caso eles acessem a página da categoria sem um serviço específico selecionado.
+  useEffect(() => {
+    const servicoQuery = searchParams.get('servico');
+    if (isAuthenticated && category && !servicoQuery) {
+      navigate(`/request/new?category=${encodeURIComponent(category.name)}`, { replace: true });
+    }
+  }, [isAuthenticated, category, navigate, searchParams]);
+
   // Se o usuário clicar em um serviço ou se vier do mega-menu com um serviço pré-selecionado
   useEffect(() => {
     const servicoQuery = searchParams.get('servico');
     if (servicoQuery && category) {
-      handleServiceClick(servicoQuery);
+      const serviceExists = category.items.find(i => i.toLowerCase() === servicoQuery.toLowerCase());
+      if (serviceExists) {
+        // Delay slightly to ensure component is mounted and state is stable
+        setTimeout(() => {
+          handleServiceClick(serviceExists);
+        }, 0);
+      } else {
+        // If the service is not in this category, we just clear the query param and stay on the page
+        navigate(`/categoria/${slug}`, { replace: true });
+      }
     }
-  }, [searchParams, category]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, category, navigate, slug]);
 
   const handleServiceClick = (service: string) => {
     if (!category) return;

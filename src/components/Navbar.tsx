@@ -85,11 +85,13 @@ const Navbar = () => {
           <div className="flex items-center gap-6 flex-shrink-0">
             {isAuthenticated ? (
               <>
-                {/* Plano Profissional / Carteira */}
+                {/* Plano Profissional / Carteira (Diamantes) */}
                 {user?.role === 'professional' && (
-                  <Link to="/wallet" className="flex items-center gap-2 text-slate-600 hover:text-primary px-3 py-2 rounded-lg transition-colors group">
-                    <Diamond className="w-6 h-6 group-hover:fill-primary/20" />
-                    <span className="text-sm font-semibold hidden lg:block">Carteira</span>
+                  <Link to="/wallet" className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors cursor-pointer border border-blue-100 shadow-sm mr-2">
+                    <div className="bg-blue-500 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
+                      <span className="text-white text-xs font-bold">💎</span>
+                    </div>
+                    <span className="font-bold text-slate-700">{user?.coinsBalance || 0}</span>
                   </Link>
                 )}
 
@@ -313,11 +315,11 @@ const Navbar = () => {
                       const category = CATEGORY_MENUS.find(c => c.name === activeCategory);
                       return (
                         <Link
-                        key={item}
-                        to={`/categoria/${CATEGORY_MENUS.find(c => c.name === activeCategory)?.slug}?servico=${encodeURIComponent(item)}`}
-                        className="text-sm text-slate-500 hover:text-primary transition-colors"
-                        onClick={() => setActiveCategory(null)}
-                      >
+                          key={item}
+                          to={`/categoria/${category?.slug}?servico=${encodeURIComponent(item)}`}
+                          className="flex items-center gap-2 text-sm text-slate-500 hover:text-primary transition-colors"
+                          onClick={() => setActiveCategory(null)}
+                        >
                           <ChevronDown className="w-3 h-3 -rotate-90 text-slate-300" />
                           {item}
                         </Link>
@@ -346,6 +348,14 @@ const Navbar = () => {
                {user?.role === 'client' && (
                  <Link to="/request/new" className="bg-orange-500 text-white p-2 rounded-full">
                    <Plus className="w-5 h-5" />
+                 </Link>
+               )}
+               {user?.role === 'professional' && (
+                 <Link to="/wallet" className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors cursor-pointer border border-blue-100 shadow-sm">
+                   <div className="bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
+                     <span className="text-white text-[10px] font-bold">💎</span>
+                   </div>
+                   <span className="font-bold text-slate-700">{user?.coinsBalance || 0}</span>
                  </Link>
                )}
              </div>
