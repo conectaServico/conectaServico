@@ -1,27 +1,36 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useUserStore } from '@/store/userStore';
-import { 
-  User, 
+import { useAudienceStore } from '@/store/audienceStore';
+import {
+  User,
   MessageSquare, 
   Home, 
   ClipboardList, 
   Bell, 
   ChevronDown,
-  Diamond,
   Plus
 } from 'lucide-react';
 import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useNotifications } from '@/hooks/useNotifications';
 import { CATEGORY_MENUS } from '@/utils/categories';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useUserStore();
+  const { audience, setAudience } = useAudienceStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Alterna a "visão" da home (cliente x profissional) e leva para a home.
+  const pickAudience = (a: 'client' | 'professional') => {
+    setAudience(a);
+    navigate('/');
+  };
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const hasUnread = useUnreadMessages();
+  const { items: notifs, unreadCount, markAllRead, markRead } = useNotifications();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -124,31 +133,53 @@ const Navbar = () => {
                   >
                     <div className="relative">
                       <Bell className="w-6 h-6 group-hover:fill-slate-100 rounded" />
-                      {hasUnread && (
-                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-danger rounded-full border-2 border-white"></span>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
                       )}
                     </div>
-                    <span className="text-sm font-semibold hidden lg:block">Notificações</span>
+                    <span className="text-sm font-semibold hidden lg:block">Avisos</span>
                   </button>
 
                   {/* Dropdown Notificações */}
                   {showNotifications && (
                     <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 overflow-hidden">
                       <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-extrabold text-slate-800">Notificações</h3>
+                        <h3 className="font-extrabold text-slate-800">Avisos</h3>
+                        {unreadCount > 0 && (
+                          <button onClick={markAllRead} className="text-xs font-bold text-primary hover:underline">
+                            Marcar lido
+                          </button>
+                        )}
                       </div>
                       <div className="max-h-80 overflow-y-auto">
-                        {hasUnread && (
-                          <Link to="/chats" onClick={() => setShowNotifications(false)} className="block px-4 py-3 hover:bg-slate-50 border-b border-slate-50 relative bg-primary/5">
-                            <p className="text-sm font-bold text-slate-800">Nova mensagem recebida! 💬</p>
-                            <p className="text-xs text-slate-500 mt-1">Acesse o chat para continuar negociando.</p>
-                          </Link>
+                        {notifs.length === 0 ? (
+                          <p className="px-4 py-6 text-sm text-slate-400 text-center">Nenhum aviso ainda.</p>
+                        ) : (
+                          notifs.slice(0, 6).map((n) => (
+                            <button
+                              key={n.id}
+                              onClick={() => {
+                                if (!n.read) markRead(n.id);
+                                setShowNotifications(false);
+                                if (n.link) navigate(n.link);
+                              }}
+                              className={`w-full text-left block px-4 py-3 hover:bg-slate-50 border-b border-slate-50 ${!n.read ? 'bg-primary/5' : ''}`}
+                            >
+                              <p className="text-sm font-bold text-slate-800">{n.title}</p>
+                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.body}</p>
+                            </button>
+                          ))
                         )}
-                        <div className="px-4 py-3 hover:bg-slate-50">
-                          <p className="text-sm font-bold text-slate-800">Bem-vindo(a)! 🎉</p>
-                          <p className="text-xs text-slate-500 mt-1">Complete seu perfil para começar.</p>
-                        </div>
                       </div>
+                      <Link
+                        to="/notifications"
+                        onClick={() => setShowNotifications(false)}
+                        className="block px-4 py-2.5 text-center text-sm font-bold text-primary hover:bg-slate-50 border-t border-slate-100"
+                      >
+                        Ver todos
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -268,10 +299,29 @@ const Navbar = () => {
                 )}
               </>
             ) : (
-              <div className="flex items-center gap-6">
-                <Link to="/register" className="text-slate-600 hover:text-primary font-bold text-sm">Seja um profissional</Link>
-                <Link to="/help" className="text-slate-600 hover:text-primary font-bold text-sm">Como funciona?</Link>
-                <Link to="/help/safety" className="text-slate-600 hover:text-primary font-bold text-sm">Segurança</Link>
+              <div className="flex items-center gap-5">
+                <Link to="/help" className="text-slate-600 hover:text-primary font-bold text-sm hidden lg:block">Como funciona?</Link>
+                <Link to="/help/safety" className="text-slate-600 hover:text-primary font-bold text-sm hidden lg:block">Segurança</Link>
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-full">
+                  <button
+                    type="button"
+                    onClick={() => pickAudience('client')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      audience === 'client' ? 'bg-white text-blue-950 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Quero ser cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => pickAudience('professional')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      audience === 'professional' ? 'bg-blue-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Quero ser profissional
+                  </button>
+                </div>
                 <div className="w-px h-6 bg-slate-200"></div>
                 <Link to="/login" className="flex items-center gap-2 text-primary font-bold hover:bg-primary/5 px-4 py-2 rounded-full transition-colors">
                   <User className="w-5 h-5" />
@@ -283,7 +333,7 @@ const Navbar = () => {
         </div>
 
         {/* Desktop Categories Menu - OLX / GetNinjas Style */}
-        {(!user || user.type === 'client') && (
+        {(!user || user.role === 'client') && (
           <div className="border-t border-slate-100 bg-white" ref={categoryMenuRef}>
             <div className="container mx-auto max-w-5xl px-4 relative">
               <div className="flex justify-between items-center overflow-x-auto hide-scrollbar">
@@ -363,6 +413,30 @@ const Navbar = () => {
             <Link to="/login" className="text-sm font-bold text-primary">Entrar</Link>
           )}
         </div>
+
+        {/* Escolha cliente x profissional (deslogado) — rótulo curto pra caber em telas pequenas */}
+        {!isAuthenticated && (
+          <div className="px-4 pb-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => pickAudience('client')}
+              className={`flex-1 min-w-0 py-1.5 px-1 rounded-full text-xs font-bold truncate transition-all ${
+                audience === 'client' ? 'bg-blue-950 text-white' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              Sou cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => pickAudience('professional')}
+              className={`flex-1 min-w-0 py-1.5 px-1 rounded-full text-xs font-bold truncate transition-all ${
+                audience === 'professional' ? 'bg-blue-900 text-white' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              Sou profissional
+            </button>
+          </div>
+        )}
       </nav>
       )}
 
@@ -389,7 +463,19 @@ const Navbar = () => {
               </div>
               <span className="text-[10px] font-bold">Chat</span>
             </Link>
-            
+
+            <Link to="/notifications" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/notifications') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
+              <div className="relative">
+                <Bell className="w-6 h-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-0.5 bg-danger text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-bold">Avisos</span>
+            </Link>
+
             <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/profile') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
               <User className="w-6 h-6" />
               <span className="text-[10px] font-bold">Perfil</span>

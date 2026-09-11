@@ -1,13 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
-import { User, ServiceRequest, Review } from '@/types';
-import { Search as SearchIcon, MapPin, Star, User as UserIcon, Loader2, ChevronRight, Filter, X, ShieldCheck, Briefcase } from 'lucide-react';
+import Select from '@/components/Select';
+import { PublicProfile, ServiceRequest } from '@/types';
+import { queryTokens } from '@/utils/search';
+import { Search as SearchIcon, MapPin, Star, User as UserIcon, Filter, X, ShieldCheck, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { MAIN_CATEGORIES } from '@/utils/categories';
 
 const Search = () => {
@@ -18,91 +28,96 @@ const Search = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [results, setResults] = useState<any[]>([]);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'rating'>('recent');
-  
+
   // Filtros
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  useEffect(() => {
-    if (user?.role === 'client') {
-      navigate('/home');
-      return;
-    }
+  const PAGE_SIZE = 24;
+  const qTokens = queryTokens(q);
+  const isTextSearch = qTokens.length > 0;
 
-    const fetchResults = async () => {
+  // Sem termo de busca: página por recência (com "carregar mais").
+  // Com termo: consulta `searchTokens` via array-contains-any (até 60), ranqueada no
+  // cliente por nº de tokens em comum. Estado/categoria continuam como filtro local.
+  const fetchPage = useCallback(
+    async (after: QueryDocumentSnapshot<DocumentData> | null) => {
+      if (!user) return;
+
+      const isClient = user.role === 'client';
+      const col = isClient ? collection(db, 'publicProfiles') : collection(db, 'serviceRequests');
+      const baseWhere = isClient
+        ? where('role', '==', 'professional')
+        : where('status', '==', 'OPEN');
+
+      const mapRow = (d: QueryDocumentSnapshot<DocumentData>) => {
+        if (isClient) return { id: d.id, ...d.data() } as PublicProfile & { _score?: number };
+        const r = { id: d.id, ...d.data() } as ServiceRequest & { _score?: number };
+        return { ...r, clientName: r.clientName || 'Cliente' };
+      };
+
+      if (isTextSearch) {
+        const snap = await getDocs(
+          query(col, baseWhere, where('searchTokens', 'array-contains-any', qTokens), limit(60))
+        );
+        const tokenSet = new Set(qTokens);
+        const rows = snap.docs.map((d) => {
+          const row = mapRow(d) as { _score?: number; searchTokens?: string[] };
+          row._score = (row.searchTokens || []).filter((t) => tokenSet.has(t)).length;
+          return row;
+        });
+        setResults(rows);
+        setCursor(null);
+        setHasMore(false);
+        return;
+      }
+
+      const parts = [col, baseWhere, orderBy('created_at', 'desc'), limit(PAGE_SIZE)] as const;
+      const snapshot = await getDocs(after ? query(...parts, startAfter(after)) : query(...parts));
+      const rows = snapshot.docs.map(mapRow);
+      setResults((prev) => (after ? [...prev, ...rows] : rows));
+      setCursor(snapshot.docs[snapshot.docs.length - 1] ?? after);
+      setHasMore(snapshot.docs.length === PAGE_SIZE);
+    },
+    // qTokens é derivado de `q` (searchParams); a string basta como dependência
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, q]
+  );
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
       setLoading(true);
       try {
-        if (!user) return;
-
-        // Cliente busca profissionais
-        if (user.role === 'client') {
-          const usersRef = collection(db, 'users');
-          let qUsers = query(usersRef, where('role', '==', 'professional'));
-
-          const snapshot = await getDocs(qUsers);
-          let profs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
-
-          // Filtro por estado no client-side (MVP) para evitar erro de índice composto no Firestore
-          if (cityParam) {
-            profs = profs.filter(p => p.state === cityParam);
-          }
-
-          // Filtro textual no client-side (MVP)
-          if (q) {
-            const lowerQ = q.toLowerCase();
-            profs = profs.filter(p => 
-              p.name.toLowerCase().includes(lowerQ) || 
-              (p.services && p.services.some(s => s.toLowerCase().includes(lowerQ))) ||
-              (p.bio && p.bio.toLowerCase().includes(lowerQ))
-            );
-          }
-
-          setResults(profs);
-        } 
-        // Profissional busca serviços (Fall-back if accessed directly)
-        else {
-          const reqRef = collection(db, 'serviceRequests');
-          let qReqs = query(reqRef, where('status', '==', 'OPEN'));
-
-          const snapshot = await getDocs(qReqs);
-          let reqs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ServiceRequest));
-
-          if (cityParam) {
-            reqs = reqs.filter(r => r.state === cityParam);
-          }
-
-          if (q) {
-            const lowerQ = q.toLowerCase();
-            reqs = reqs.filter(r => 
-              r.category.toLowerCase().includes(lowerQ) || 
-              r.propertyType.toLowerCase().includes(lowerQ) ||
-              r.description.toLowerCase().includes(lowerQ)
-            );
-          }
-
-          const reqsWithClientInfo = await Promise.all(reqs.map(async (r) => {
-             const clientDoc = await getDoc(doc(db, 'users', r.clientId));
-             return {
-                ...r,
-                clientName: clientDoc.exists() ? (clientDoc.data() as User).name : 'Cliente'
-             }
-          }));
-
-          setResults(reqsWithClientInfo);
-        }
-
+        if (active) await fetchPage(null);
       } catch (error) {
         console.error('Error fetching search results:', error);
         toast.error('Erro ao realizar busca.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
+    })();
+    return () => {
+      active = false;
     };
+  }, [fetchPage]);
 
-    fetchResults();
-  }, [q, cityParam, user]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      await fetchPage(cursor);
+    } catch (error) {
+      console.error('Error fetching more results:', error);
+      toast.error('Erro ao carregar mais resultados.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const toggleCategory = (cat: string) => {
     if (selectedCategories.includes(cat)) {
@@ -112,28 +127,31 @@ const Search = () => {
     }
   };
 
-  // Aplicação dos filtros de categoria e ordenação no client-side
-  let filteredResults = results.filter(item => {
+  // Filtros client-side: estado e categoria. O texto já foi resolvido no servidor
+  // (searchTokens) quando há termo de busca.
+  const filteredResults = results.filter(item => {
+    const isClient = user?.role === 'client';
+
+    // estado (?city= carrega uma UF)
+    if (cityParam && item.state && item.state !== cityParam) return false;
+
+    // categoria (sidebar)
     if (selectedCategories.length === 0) return true;
-    if (user?.role === 'client') {
-      // Verifica se o profissional tem alguma das categorias selecionadas nos serviços dele
-      // Como não temos um campo 'category' exato no profissional, vamos checar os services ou criar um mapping
-      // MVP: checar se algum "service" do profissional contém o texto da categoria principal
-      const prof = item as User;
+    if (isClient) {
+      const prof = item as PublicProfile;
       if (!prof.services) return false;
-      return selectedCategories.some(cat => 
+      return selectedCategories.some(cat =>
         prof.services!.some(s => s.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(s.toLowerCase()))
       );
-    } else {
-      return selectedCategories.includes(item.category);
     }
+    return selectedCategories.includes(item.category);
   });
 
-  if (sortBy === 'rating' && user?.role === 'client') {
-    filteredResults.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  } else {
-    filteredResults.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-  }
+  filteredResults.sort((a, b) => {
+    if (isTextSearch) return (b._score || 0) - (a._score || 0) || (b.rating || 0) - (a.rating || 0);
+    if (sortBy === 'rating' && user?.role === 'client') return (b.rating || 0) - (a.rating || 0);
+    return (b.created_at || 0) - (a.created_at || 0);
+  });
 
   if (!user) return null;
 
@@ -152,16 +170,17 @@ const Search = () => {
           </p>
         </div>
 
-        <div className="relative">
-          <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'recent' | 'rating')}
-            className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm cursor-pointer"
-          >
-            <option value="recent">Mais Recentes</option>
-            {user.role === 'client' && <option value="rating">Melhor Avaliação</option>}
-          </select>
-        </div>
+        <Select
+          value={sortBy}
+          onChange={(v) => setSortBy(v as 'recent' | 'rating')}
+          options={[
+            { value: 'recent', label: 'Mais Recentes' },
+            ...(user.role === 'client' ? [{ value: 'rating', label: 'Melhor Avaliação' }] : []),
+          ]}
+          className="w-full md:w-56"
+          buttonClassName="bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 shadow-sm"
+          ariaLabel="Ordenar resultados"
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -251,7 +270,7 @@ const Search = () => {
           ) : (
             <div className="flex flex-col gap-5">
               {user.role === 'client' 
-                ? filteredResults.map((prof: User) => (
+                ? filteredResults.map((prof: PublicProfile) => (
                     <div key={prof.id} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:border-primary/50 group">
                       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
                         <div className="flex items-start gap-4 flex-1">
@@ -285,7 +304,7 @@ const Search = () => {
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/new?profId=${prof.id}`);
+                              navigate(`/request/new?profId=${prof.id}`);
                             }}
                             className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold hover:bg-primary-hover transition-colors shadow-sm shadow-primary/20 w-full md:w-auto text-center"
                           >
@@ -345,6 +364,20 @@ const Search = () => {
                     </div>
                   ))
               }
+
+              {hasMore && (
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="mx-auto mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                >
+                  {loadingMore ? (
+                    <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-slate-500" />
+                  ) : (
+                    'Carregar mais'
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>

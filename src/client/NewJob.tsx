@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { attachProfessionalToRequestFn, callableErrorMessage } from '@/services/api';
+import { buildGeoFields } from '@/utils/geo';
+import { buildSearchTokens } from '@/utils/search';
+import { uploadImages } from '@/utils/images';
 import { useUserStore } from '@/store/userStore';
-import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { useVerified } from '@/hooks/useVerified';
+import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2, ImagePlus, X } from 'lucide-react';
 import { ServiceRequest, Urgency, MaterialOption } from '@/types';
 import { maskCEP } from '@/utils/masks';
 
@@ -13,6 +18,7 @@ const PROPERTY_TYPES = ['Casa', 'Apartamento', 'Comercial', 'Condomínio'];
 
 const NewJob = () => {
   const { user } = useUserStore();
+  const { verified } = useVerified();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const profId = searchParams.get('profId');
@@ -33,6 +39,11 @@ const NewJob = () => {
       setCategory('');
     }
   }, [defaultCategory]);
+
+  // Ao trocar de etapa, volta o scroll para o topo do formulário.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
   const [propertyType, setPropertyType] = useState('');
   const [urgency, setUrgency] = useState<Urgency>('Média (Próximas semanas)');
   const [areaSize, setAreaSize] = useState('');
@@ -42,6 +53,15 @@ const NewJob = () => {
   const [description, setDescription] = useState('');
   const [materialOption, setMaterialOption] = useState<MaterialOption>('A combinar');
   const [preferredDate, setPreferredDate] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
+  const MAX_PHOTOS = 6;
+
+  const addPhotos = (files: FileList | null) => {
+    if (!files) return;
+    const picked = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    setPhotos((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS));
+  };
+  const removePhoto = (idx: number) => setPhotos((prev) => prev.filter((_, i) => i !== idx));
 
   // Step 3
   const [cep, setCep] = useState(user?.cep || '');
@@ -111,15 +131,43 @@ const NewJob = () => {
 
   const handleSubmit = async () => {
     if (!user) return;
+    if (!verified) {
+      setError('Confirme seu e-mail e telefone para publicar um pedido.');
+      navigate('/verify');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
+      // Evita pedido duplicado: já tem um em aberto/negociação para o mesmo serviço?
+      const dupSnap = await getDocs(
+        query(
+          collection(db, 'serviceRequests'),
+          where('clientId', '==', user.id),
+          where('status', 'in', ['OPEN', 'NEGOTIATING'])
+        )
+      );
+      const dup = dupSnap.docs.find((d) => {
+        const r = d.data();
+        return r.category === category && (r.subcategory || '') === (subcategory || '');
+      });
+      if (dup && !profId) {
+        setLoading(false);
+        setError('Você já tem um pedido aberto para esse serviço. Acompanhe ou cancele o atual antes de criar outro.');
+        return;
+      }
+
+      // Localização normalizada (uf/cityKey/lat/lng/geohash) para a busca por raio
+      // do profissional. Nunca bloqueia o envio: se o geocode falhar, volta {}.
+      const geo = await buildGeoFields({ cep, uf: stateUF, city, street });
+
       // Save to Firestore
       const requestData: Omit<ServiceRequest, 'id'> = {
         clientId: user.id,
         clientName: user.name,
-        clientPhone: user.phone,
+        clientRating: user.clientRating || 0,
+        clientReviewCount: user.clientReviewCount || 0,
         category,
         subcategory,
         propertyType,
@@ -127,6 +175,7 @@ const NewJob = () => {
         hasBlueprint: hasBlueprint ?? undefined,
         preferredDate: preferredDate || undefined,
         description,
+        searchTokens: buildSearchTokens([category, subcategory, description, city, neighborhood]),
         city,
         state: stateUF,
         neighborhood,
@@ -136,42 +185,38 @@ const NewJob = () => {
         cep,
         urgency,
         materialOption,
-        status: profId ? 'NEGOTIATING' : 'OPEN', // Se for direto, já começa negociando
+        status: 'OPEN',
         created_at: Date.now(),
+        ...geo,
       };
 
       const docRef = await addDoc(collection(db, 'serviceRequests'), requestData);
 
+      // Fotos: sobem depois do create (precisam do id) e não bloqueiam o pedido.
+      if (photos.length) {
+        try {
+          const urls = await uploadImages(photos, `requestPhotos/${user.id}/${docRef.id}`);
+          if (urls.length) await updateDoc(doc(db, 'serviceRequests', docRef.id), { photos: urls });
+        } catch (upErr) {
+          console.error('Falha ao subir fotos do pedido:', upErr);
+        }
+      }
+
       if (profId) {
-        // Se for um pedido direto para um profissional, cria uma proposta automática para abrir o chat
-        await addDoc(collection(db, 'proposals'), {
+        // Orçamento direto: a proposta aceita + a 1ª mensagem são criadas no servidor.
+        const { data } = await attachProfessionalToRequestFn({
           requestId: docRef.id,
           professionalId: profId,
-          estimatedPrice: 0,
-          estimatedDays: 'A combinar',
-          message: 'Solicitação de orçamento direto.',
-          status: 'accepted', // accepted para liberar o chat
-          created_at: Date.now(),
-          updated_at: Date.now()
+          message: `Olá! Solicitei um orçamento direto pelo seu perfil para o serviço de ${subcategory || category}. A descrição é: "${description}". Aguardo seu retorno!`,
         });
-
-        // Cria a primeira mensagem do chat
-        await addDoc(collection(db, 'messages'), {
-          chatId: `${docRef.id}_${profId}`,
-          senderId: user.id,
-          text: `Olá! Solicitei um orçamento direto pelo seu perfil para o serviço de ${subcategory || category}. A descrição é: "${description}". Aguardo seu retorno!`,
-          created_at: Date.now(),
-          read: false,
-        });
-
-        navigate(`/chats/${docRef.id}_${profId}`);
+        navigate(`/chats/${data.chatId}`);
         return;
       }
 
       navigate('/request/success');
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError('Erro ao enviar pedido. Tente novamente.');
+      setError(callableErrorMessage(err, 'Erro ao enviar pedido. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -214,7 +259,7 @@ const NewJob = () => {
             {!category && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-base font-bold text-slate-800 mb-3">Qual a categoria do serviço?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 -mr-1">
                   {MAIN_CATEGORIES.map(cat => (
                     <button
                       key={cat}
@@ -251,7 +296,7 @@ const NewJob = () => {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1 -mr-1">
                   {CATEGORIES_MAP[category]?.map(sub => (
                     <button
                       key={sub}
@@ -405,6 +450,46 @@ const NewJob = () => {
                 onChange={(e) => setPreferredDate(e.target.value)}
               />
               <p className="text-xs text-slate-500 mt-1">Isso ajuda o profissional a se programar (Opcional).</p>
+            </div>
+
+            <div>
+              <label className="block text-base font-bold text-slate-800 mb-2">
+                Fotos do local ou do problema <span className="font-medium text-slate-500">(opcional)</span>
+              </label>
+              <p className="text-sm text-slate-500 mb-3">
+                Profissionais com fotos entendem melhor o serviço e mandam orçamentos mais precisos. Até {MAX_PHOTOS}.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {photos.map((file, idx) => (
+                  <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 group">
+                    <img src={URL.createObjectURL(file)} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(idx)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition-colors"
+                      aria-label="Remover foto"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {photos.length < MAX_PHOTOS && (
+                  <label className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                    <ImagePlus className="w-6 h-6" />
+                    <span className="text-[11px] font-bold">Adicionar</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        addPhotos(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
           </div>
         )}

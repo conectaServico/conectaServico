@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, writeBatch, getDocs, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot, addDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import { ServiceRequest, Proposal, Review, Unlock, User } from '@/types';
+import { acceptProposalFn, unlockContactFn, cancelRequestFn, reopenRequestFn, deleteRequestFn, startWorkFn, completeWorkFn, callableErrorMessage } from '@/services/api';
+import { ServiceRequest, Proposal, Review, ClientReview, Urgency } from '@/types';
 import { useUserStore } from '@/store/userStore';
-import { MapPin, Clock, Briefcase, AlertCircle, ShieldCheck, ChevronLeft, Loader2, MessageSquare, Calendar, Hammer, Image as ImageIcon, Send, Edit2, X, Check, LockOpen, Maximize, FileText, Info, MoreVertical, Map, Trash2, Phone, Mail } from 'lucide-react';
+import { useVerified } from '@/hooks/useVerified';
+import { MapPin, Clock, Briefcase, ShieldCheck, ChevronLeft, Loader2, MessageSquare, Calendar, Hammer, Edit2, X, Check, LockOpen, Maximize, FileText, Info, MoreVertical, Map, Trash2, Phone, Mail, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import Select from '@/components/Select';
 
 const RequestDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useUserStore();
+  const { verified } = useVerified();
   
   const [request, setRequest] = useState<ServiceRequest | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -27,21 +31,31 @@ const RequestDetails = () => {
   // Edit Request State
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const [editUrgency, setEditUrgency] = useState('');
+  const [editUrgency, setEditUrgency] = useState<Urgency>('Média (Próximas semanas)');
   const [savingEdit, setSavingEdit] = useState(false);
   
-  // Reviews
+  // Reviews (cliente -> profissional)
   const [existingReview, setExistingReview] = useState<Review | null>(null);
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewWouldHireAgain, setReviewWouldHireAgain] = useState(true);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Reviews (profissional -> cliente)
+  const [existingClientReview, setExistingClientReview] = useState<ClientReview | null>(null);
+  const [crRating, setCrRating] = useState<number>(5);
+  const [crSmooth, setCrSmooth] = useState(true);
+  const [crComment, setCrComment] = useState('');
+  const [submittingCr, setSubmittingCr] = useState(false);
   const [acceptingProposal, setAcceptingProposal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Confirm Modal States
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ proposalId: string, professionalId: string } | null>(null);
+
+  // Lightbox de fotos
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   // Unlocks & Coins
   const [hasUnlocked, setHasUnlocked] = useState(false);
@@ -97,31 +111,40 @@ const RequestDetails = () => {
     };
     fetchReview();
 
-    // Verificar se o profissional já desbloqueou e buscar dados do cliente
     if (user.role === 'professional') {
-      const checkUnlockAndFetchClient = async () => {
-        try {
-          if (request?.clientId) {
-            const clientDoc = await getDoc(doc(db, 'users', request.clientId));
-            if (clientDoc.exists()) {
-              const clientData = clientDoc.data() as User;
-              setClientPhone(clientData.phone || null);
-              setClientName(clientData.name || null);
-            }
-          }
+      getDoc(doc(db, 'clientReviews', `${id}_${user.id}`))
+        .then((s) => setExistingClientReview(s.exists() ? ({ id: s.id, ...s.data() } as ClientReview) : null))
+        .catch(() => setExistingClientReview(null));
+    }
 
-          const q = query(collection(db, 'unlocks'), where('requestId', '==', id), where('professionalId', '==', user.id));
+    // O profissional não lê mais o doc privado do cliente. Se ele já desbloqueou,
+    // re-hidratamos o contato pela própria Function (idempotente, não cobra de novo).
+    if (user.role === 'professional') {
+      const checkUnlock = async () => {
+        try {
+          const q = query(
+            collection(db, 'unlocks'),
+            where('requestId', '==', id),
+            where('professionalId', '==', user.id)
+          );
           const snap = await getDocs(q);
-          if (!snap.empty) {
-            setHasUnlocked(true);
+          if (snap.empty) return;
+
+          setHasUnlocked(true);
+          try {
+            const { data } = await unlockContactFn({ requestId: id });
+            setClientPhone(data.clientPhone || null);
+            setClientName(data.clientName || null);
+          } catch (e) {
+            console.error(e);
           }
         } catch (e) {
           console.error(e);
         }
       };
-      checkUnlockAndFetchClient();
+      checkUnlock();
     }
-  }, [id, user?.id, request?.clientId]);
+  }, [id, user?.id, user?.role]);
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin w-12 h-12 text-primary" /></div>;
   if (error || !request) return <div className="text-center py-20"><p className="text-danger font-bold">{error || 'Pedido não encontrado'}</p></div>;
@@ -151,11 +174,17 @@ const RequestDetails = () => {
   const handleUnlockContact = async () => {
     if (!user || !request || !id) return;
 
+    if (!verified) {
+      toast.error('Confirme seu e-mail e telefone para desbloquear contatos.');
+      navigate('/verify');
+      return;
+    }
+
     if (!user.photo_url) {
       toast.error('Você precisa ter uma foto de perfil para desbloquear contatos. Vá em Meu Perfil e adicione uma foto.');
       return;
     }
-    
+
     if ((user.coinsBalance || 0) < UNLOCK_COST) {
       toast.error('Saldo insuficiente. Você precisa de mais diamantes para desbloquear.');
       return;
@@ -163,93 +192,93 @@ const RequestDetails = () => {
 
     setUnlocking(true);
     try {
-      const now = Date.now();
-      const batch = writeBatch(db);
-
-      // Desconta moedas do usuário
-      const userRef = doc(db, 'users', user.id);
-      batch.update(userRef, { coinsBalance: increment(-UNLOCK_COST) });
-
-      // Registra o desbloqueio
-      const unlockRef = doc(collection(db, 'unlocks'));
-      batch.set(unlockRef, {
-        requestId: id,
-        professionalId: user.id,
-        cost: UNLOCK_COST,
-        created_at: now
-      });
-
-      // Registra transação
-      const txRef = doc(collection(db, 'transactions'));
-      batch.set(txRef, {
-        userId: user.id,
-        amount: -UNLOCK_COST,
-        type: 'UNLOCK_CONTACT',
-        description: `Desbloqueio do pedido #${id.substring(0, 5)}`,
-        created_at: now
-      });
-
-      // Incrementa no pedido
-      const jobRef = doc(db, 'serviceRequests', id);
-      batch.update(jobRef, { unlockCount: increment(1) });
-
-      await batch.commit();
+      // Débito + registro + retorno do contato são feitos de forma atômica no servidor.
+      const { data } = await unlockContactFn({ requestId: id });
 
       setHasUnlocked(true);
-      setRequest({ ...request, unlockCount: (request.unlockCount || 0) + 1 });
-      
-      // Atualiza saldo local do usuário
-      useUserStore.getState().setUser({ ...user, coinsBalance: (user.coinsBalance || 0) - UNLOCK_COST });
-      
-      // Tentar buscar o telefone do cliente
-      const clientDoc = await getDoc(doc(db, 'users', request.clientId));
-      if (clientDoc.exists()) {
-        const clientData = clientDoc.data() as User;
-        setClientPhone(clientData.phone || null);
-        setClientName(clientData.name || null);
+      setClientPhone(data.clientPhone || null);
+      setClientName(data.clientName || null);
+
+      if (!data.alreadyUnlocked) {
+        setRequest({ ...request, unlockCount: (request.unlockCount || 0) + 1 });
+        const newBalance =
+          typeof data.newBalance === 'number'
+            ? data.newBalance
+            : Math.max(0, (user.coinsBalance || 0) - UNLOCK_COST);
+        useUserStore.getState().setUser({ ...user, coinsBalance: newBalance });
+        toast.success('Contato desbloqueado com sucesso!');
       }
-      
-      toast.success('Contato desbloqueado com sucesso!');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao desbloquear contato. Tente novamente.');
+      toast.error(callableErrorMessage(err, 'Erro ao desbloquear contato. Tente novamente.'));
     } finally {
       setUnlocking(false);
     }
   };
 
+  const handleDismissLead = async () => {
+    if (!user || !id) return;
+    try {
+      await setDoc(doc(db, 'users', user.id, 'dismissedLeads', id), { created_at: Date.now() });
+    } catch (err) {
+      console.error('Falha ao ocultar lead:', err);
+    }
+    navigate(-1);
+  };
+
   const handleSendProposal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !request) return;
+    if (!user || !request || !id) return;
+    if (!message.trim()) return;
+
+    if (!verified) {
+      toast.error('Confirme seu e-mail e telefone para enviar propostas.');
+      navigate('/verify');
+      return;
+    }
 
     if (!user.photo_url) {
-      toast.error('Você precisa ter uma foto de perfil para enviar orçamentos. Vá em Meu Perfil e adicione uma foto.');
+      toast.error('Você precisa ter uma foto de perfil para enviar mensagens. Vá em Meu Perfil e adicione uma foto.');
       return;
     }
 
     setSendingProposal(true);
     try {
-      const newProposal: Omit<Proposal, 'id'> = {
-        requestId: request.id,
-        professionalId: user.id,
-        professionalName: user.name,
-        professionalPhoto: user.photo_url || '',
-        professionalRating: 5.0, // Default for now
-        estimatedPrice: 0,
-        estimatedDays: 'A combinar',
-        message,
-        status: 'pending',
-        created_at: Date.now()
-      };
+      const now = Date.now();
+      const chatId = `${id}_${user.id}`;
 
-      await addDoc(collection(db, 'proposals'), newProposal);
-      
-      // Limpar formulário
+      // A primeira mensagem converte o lead em conversa (cria a proposta).
+      // As mensagens seguintes vão apenas para o chat, sem duplicar propostas.
+      if (!hasAlreadyProposed) {
+        const newProposal: Omit<Proposal, 'id'> = {
+          requestId: request.id,
+          professionalId: user.id,
+          clientId: request.clientId,
+          professionalName: user.name,
+          professionalPhoto: user.photo_url || '',
+          professionalRating: user.rating || 5.0,
+          estimatedPrice: 0,
+          estimatedDays: 'A combinar',
+          message: message.trim(),
+          status: 'pending',
+          created_at: now,
+        };
+        await addDoc(collection(db, 'proposals'), newProposal);
+      }
+
+      await addDoc(collection(db, 'messages'), {
+        chatId,
+        senderId: user.id,
+        text: message.trim(),
+        created_at: now,
+        read: false,
+      });
+
       setMessage('');
       toast.success('Mensagem enviada com sucesso!');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao enviar proposta. Tente novamente.');
+      toast.error('Erro ao enviar mensagem. Tente novamente.');
     } finally {
       setSendingProposal(false);
     }
@@ -300,74 +329,86 @@ const RequestDetails = () => {
       setIsConfirmOpen(false);
       setConfirmAction(null);
       handleCompleteWork();
+    } else if (confirmAction.proposalId === 'cancel') {
+      setIsConfirmOpen(false);
+      setConfirmAction(null);
+      handleCancelRequest();
+    } else if (confirmAction.proposalId === 'delete') {
+      setIsConfirmOpen(false);
+      setConfirmAction(null);
+      handleDeleteRequest();
     } else {
       handleAcceptProposal();
     }
   };
 
+  const handleDeleteRequest = async () => {
+    if (!id) return;
+    setUpdatingStatus(true);
+    try {
+      await deleteRequestFn({ requestId: id });
+      toast.success('Pedido excluído.');
+      navigate('/requests');
+    } catch (err) {
+      console.error(err);
+      toast.error(callableErrorMessage(err, 'Não foi possível excluir o pedido.'));
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!request || !id) return;
+    setUpdatingStatus(true);
+    try {
+      await cancelRequestFn({ requestId: id });
+      setRequest({ ...request, status: 'CANCELED' });
+      toast.success('Pedido cancelado. Quem já tinha desbloqueado foi reembolsado.');
+    } catch (err) {
+      console.error(err);
+      toast.error(callableErrorMessage(err, 'Não foi possível cancelar o pedido.'));
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!request || !id) return;
+    setUpdatingStatus(true);
+    try {
+      await reopenRequestFn({ requestId: id });
+      setRequest({ ...request, status: 'OPEN' });
+      toast.success('Pedido reaberto.');
+    } catch (err) {
+      console.error(err);
+      toast.error(callableErrorMessage(err, 'Não foi possível reabrir o pedido.'));
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const handleAcceptProposal = async () => {
     if (!request || !id || !confirmAction) return;
-    
+
     setAcceptingProposal(true);
     setIsConfirmOpen(false);
-    
+
     const { proposalId, professionalId } = confirmAction;
 
     try {
-      const now = Date.now();
-      const batch = writeBatch(db);
+      // Aceite + rejeição das demais + reembolso dos não escolhidos: tudo no servidor.
+      await acceptProposalFn({ requestId: id, proposalId });
 
-      const jobRef = doc(db, 'serviceRequests', id);
-      batch.update(jobRef, {
+      setRequest({
+        ...request,
         status: 'NEGOTIATING',
         acceptedProfessionalId: professionalId,
-        acceptedProposalId: proposalId
+        acceptedProposalId: proposalId,
       });
 
-      const acceptedRef = doc(db, 'proposals', proposalId);
-      batch.update(acceptedRef, { status: 'accepted', accepted_at: now, updated_at: now });
-
-      proposals
-        .filter((p) => p.id !== proposalId)
-        .forEach((p) => {
-          const ref = doc(db, 'proposals', p.id);
-          batch.update(ref, { status: 'rejected', updated_at: now });
-        });
-
-      // Lógica de Estorno (Refund)
-      const unlocksQuery = query(collection(db, 'unlocks'), where('requestId', '==', id));
-      const unlocksSnap = await getDocs(unlocksQuery);
-      
-      unlocksSnap.docs.forEach(uDoc => {
-        const unlockData = uDoc.data() as Unlock;
-        if (unlockData.professionalId !== professionalId) {
-          // Devolver as moedas
-          const proRef = doc(db, 'users', unlockData.professionalId);
-          batch.update(proRef, { coinsBalance: increment(unlockData.cost) });
-          
-          // Registrar transação de reembolso
-          const txRef = doc(collection(db, 'transactions'));
-          batch.set(txRef, {
-            userId: unlockData.professionalId,
-            amount: unlockData.cost,
-            type: 'REFUND',
-            description: 'Reembolso por não ter sido escolhido no pedido',
-            created_at: now
-          });
-        }
-      });
-
-      await batch.commit();
-
-      setRequest({ ...request, status: 'NEGOTIATING', acceptedProfessionalId: professionalId, acceptedProposalId: proposalId });
-      
-      // Redirecionar para o chat
       navigate(`/chats/${id}_${professionalId}`);
-
     } catch (err) {
-      console.error("Erro ao aceitar proposta:", err);
-      const code = (err as any)?.code ? String((err as any).code) : '';
-      toast.error(code ? `Ocorreu um erro ao aceitar a proposta (${code}).` : 'Ocorreu um erro ao aceitar a proposta.');
+      console.error('Erro ao aceitar proposta:', err);
+      toast.error(callableErrorMessage(err, 'Ocorreu um erro ao aceitar a proposta.'));
     } finally {
       setAcceptingProposal(false);
       setConfirmAction(null);
@@ -378,12 +419,12 @@ const RequestDetails = () => {
     if (!request || !id) return;
     setUpdatingStatus(true);
     try {
-      await updateDoc(doc(db, 'serviceRequests', id), { status: 'IN_PROGRESS', started_at: Date.now() });
+      await startWorkFn({ requestId: id });
       setRequest({ ...request, status: 'IN_PROGRESS', started_at: Date.now() });
       toast.success('Serviço marcado como em andamento!');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao iniciar o serviço.');
+      toast.error(callableErrorMessage(err, 'Erro ao iniciar o serviço.'));
     } finally {
       setUpdatingStatus(false);
     }
@@ -393,12 +434,12 @@ const RequestDetails = () => {
     if (!request || !id) return;
     setUpdatingStatus(true);
     try {
-      await updateDoc(doc(db, 'serviceRequests', id), { status: 'COMPLETED', completed_at: Date.now() });
+      await completeWorkFn({ requestId: id });
       setRequest({ ...request, status: 'COMPLETED', completed_at: Date.now() });
       toast.success('Serviço finalizado com sucesso!');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao finalizar o serviço.');
+      toast.error(callableErrorMessage(err, 'Erro ao finalizar o serviço.'));
     } finally {
       setUpdatingStatus(false);
     }
@@ -413,6 +454,8 @@ const RequestDetails = () => {
     if (existingReview) return;
     setSubmittingReview(true);
     try {
+      // id determinístico: 1 avaliação por pedido/cliente (as regras exigem esse formato).
+      const reviewId = `${id}_${user.id}`;
       const reviewData: Omit<Review, 'id'> = {
         requestId: id,
         clientId: user.id,
@@ -420,37 +463,51 @@ const RequestDetails = () => {
         rating: reviewRating,
         comment: reviewComment.trim(),
         wouldHireAgain: reviewWouldHireAgain,
-        created_at: Date.now()
+        created_at: Date.now(),
       };
-      const ref = await addDoc(collection(db, 'reviews'), reviewData);
-      setExistingReview({ id: ref.id, ...reviewData });
+      await setDoc(doc(db, 'reviews', reviewId), reviewData);
+      setExistingReview({ id: reviewId, ...reviewData });
 
-      // Atualizar nota média do profissional
-      const reviewsSnap = await getDocs(query(collection(db, 'reviews'), where('professionalId', '==', request.acceptedProfessionalId)));
-      const allReviews = reviewsSnap.docs.map(d => d.data() as Review);
-      
-      let totalRating = 0;
-      allReviews.forEach(r => totalRating += r.rating);
-      const newRating = totalRating / allReviews.length;
-      
-      await updateDoc(doc(db, 'users', request.acceptedProfessionalId), {
-        rating: newRating,
-        reviewCount: allReviews.length
-      });
-      
+      // A média do profissional (ratingSum/reviewCount/rating) é recalculada
+      // pela Cloud Function onReviewCreated.
       toast.success('Avaliação enviada com sucesso!');
-
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao enviar avaliação.');
+      toast.error(callableErrorMessage(err, 'Erro ao enviar avaliação.'));
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleSubmitClientReview = async () => {
+    if (!user || !request || !id || existingClientReview) return;
+    setSubmittingCr(true);
+    try {
+      const reviewId = `${id}_${user.id}`;
+      const data: Omit<ClientReview, 'id'> = {
+        requestId: id,
+        clientId: request.clientId,
+        professionalId: user.id,
+        rating: crRating,
+        comment: crComment.trim(),
+        smoothDeal: crSmooth,
+        created_at: Date.now(),
+      };
+      await setDoc(doc(db, 'clientReviews', reviewId), data);
+      setExistingClientReview({ id: reviewId, ...data });
+      toast.success('Avaliação do cliente enviada!');
+    } catch (err) {
+      console.error(err);
+      toast.error(callableErrorMessage(err, 'Erro ao enviar avaliação.'));
+    } finally {
+      setSubmittingCr(false);
     }
   };
 
   const hasAlreadyProposed = proposals.some(p => p.professionalId === user?.id);
   const isClientOwner = user?.role === 'client' && request?.clientId === user?.id;
   const canEdit = isClientOwner && request?.status === 'OPEN';
+  const isAcceptedPro = user?.role === 'professional' && request?.acceptedProfessionalId === user?.id;
 
   const getHiddenName = (fullName: string | null | undefined) => {
     if (!fullName) return 'Cliente';
@@ -488,13 +545,44 @@ const RequestDetails = () => {
               </h1>
           </div>
           
-          {canEdit && !isEditing && (
-            <button 
-              onClick={handleEditClick}
-              className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors h-fit"
-            >
-              <Edit2 className="w-4 h-4" /> Editar Pedido
-            </button>
+          {isClientOwner && !isEditing && (
+            <div className="flex flex-wrap gap-2 h-fit">
+              {canEdit && (
+                <button
+                  onClick={handleEditClick}
+                  className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" /> Editar
+                </button>
+              )}
+              {['OPEN', 'NEGOTIATING'].includes(request.status) && (
+                <button
+                  onClick={() => { setConfirmAction({ proposalId: 'cancel', professionalId: 'cancel' }); setIsConfirmOpen(true); }}
+                  disabled={updatingStatus}
+                  className="flex items-center gap-2 text-sm font-bold text-danger bg-danger/10 hover:bg-danger/20 px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
+                >
+                  <X className="w-4 h-4" /> Cancelar pedido
+                </button>
+              )}
+              {request.status === 'CANCELED' && (
+                <button
+                  onClick={handleReopen}
+                  disabled={updatingStatus}
+                  className="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
+                >
+                  {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Reabrir pedido</>}
+                </button>
+              )}
+              {['OPEN', 'CANCELED'].includes(request.status) && (
+                <button
+                  onClick={() => { setConfirmAction({ proposalId: 'delete', professionalId: 'delete' }); setIsConfirmOpen(true); }}
+                  disabled={updatingStatus}
+                  className="flex items-center gap-2 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-danger/10 hover:text-danger px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
+                >
+                  <Trash2 className="w-4 h-4" /> Excluir
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -522,16 +610,18 @@ const RequestDetails = () => {
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Urgência</label>
-                <select
-                  className="w-full p-3 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none"
+                <Select
                   value={editUrgency}
-                  onChange={(e) => setEditUrgency(e.target.value)}
-                >
-                  <option value="Baixa (Pode esperar)">Baixa (Pode esperar)</option>
-                  <option value="Média (Próximas semanas)">Média (Próximas semanas)</option>
-                  <option value="Alta (O quanto antes)">Alta (O quanto antes)</option>
-                  <option value="Emergência (Imediato)">Emergência (Imediato)</option>
-                </select>
+                  onChange={(v) => setEditUrgency(v as Urgency)}
+                  options={[
+                    { value: 'Baixa (Pode esperar)', label: 'Baixa (Pode esperar)' },
+                    { value: 'Média (Próximas semanas)', label: 'Média (Próximas semanas)' },
+                    { value: 'Alta (O quanto antes)', label: 'Alta (O quanto antes)' },
+                    { value: 'Emergência (Imediato)', label: 'Emergência (Imediato)' },
+                  ]}
+                  buttonClassName="p-3 border border-slate-300 rounded-xl bg-white text-slate-900"
+                  ariaLabel="Urgência"
+                />
               </div>
             </div>
 
@@ -558,6 +648,26 @@ const RequestDetails = () => {
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Detalhes do Pedido</h3>
               <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{request.description}</p>
             </div>
+
+            {request.photos && request.photos.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4" /> Fotos ({request.photos.length})
+                </h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {request.photos.map((url, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setLightbox(url)}
+                      className="aspect-square rounded-xl overflow-hidden border border-slate-200 hover:opacity-90 transition-opacity"
+                    >
+                      <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -624,8 +734,10 @@ const RequestDetails = () => {
       )}
       </div>
 
-      {/* Área do Profissional: Mobile-first Layout */}
-      {user?.role === 'professional' && request.status === 'OPEN' && !hasAlreadyProposed && (
+      {/* Área do Profissional: Mobile-first Layout.
+          Continua visível depois de desbloquear/mandar mensagem para o pro não perder
+          o contato que pagou — o rodapé de "Liberar Pedido" some só quando já desbloqueou. */}
+      {user?.role === 'professional' && request.status === 'OPEN' && (
         <div className="bg-slate-50 min-h-screen pb-24 fixed inset-0 z-50 overflow-y-auto">
           {/* Header */}
           <div className="bg-white px-4 py-4 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100 shadow-sm">
@@ -738,6 +850,27 @@ const RequestDetails = () => {
                 </div>
               </div>
 
+              {request.photos && request.photos.length > 0 && (
+                <div className="flex gap-4">
+                  <ImageIcon className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                  <div className="border-b border-slate-100 pb-6 flex-1">
+                    <p className="text-sm text-slate-500 mb-2">Fotos do cliente ({request.photos.length})</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {request.photos.map((url, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setLightbox(url)}
+                          className="aspect-square rounded-xl overflow-hidden border border-slate-200"
+                        >
+                          <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Client Name & Status */}
               <div className="pt-4">
                 <div className="flex items-center gap-3 mb-4">
@@ -756,21 +889,26 @@ const RequestDetails = () => {
                   </span>
                 </div>
 
+                {typeof request.clientReviewCount === 'number' && request.clientReviewCount > 0 && (
+                  <div className="flex items-center gap-1 text-sm font-bold text-slate-700 mb-2">
+                    <span className="text-amber-500">★</span> {(request.clientRating || 0).toFixed(1)}
+                    <span className="text-slate-400 font-medium">({request.clientReviewCount} avaliações de profissionais)</span>
+                  </div>
+                )}
+
                 <h3 className="text-xl font-bold text-slate-900 mb-6">
-                  {hasUnlocked 
-                    ? clientName || request.clientName || 'Cliente' 
+                  {hasUnlocked
+                    ? clientName || request.clientName || 'Cliente'
                     : getHiddenName(clientName || request.clientName)}
                 </h3>
 
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center gap-3 text-slate-600">
                     <Phone className="w-5 h-5" />
-                    {hasUnlocked ? (
-                      <span className="font-medium text-slate-900">{clientPhone || request.clientPhone || '(11) 99999-9999'}</span>
+                    {hasUnlocked && clientPhone ? (
+                      <span className="font-medium text-slate-900">{clientPhone}</span>
                     ) : (
-                      <span className="text-slate-400 font-medium tracking-wide">
-                        {(clientPhone || request.clientPhone || '(11) 99999-9999').slice(0, -4)}xxxx
-                      </span>
+                      <span className="text-slate-400 font-medium tracking-widest">•••••-••••</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-slate-600">
@@ -833,6 +971,14 @@ const RequestDetails = () => {
                       {sendingProposal ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Enviar Mensagem'}
                     </button>
                   </form>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/help/contact?category=fake_lead&requestId=${id}`)}
+                    className="w-full text-center text-sm font-bold text-slate-400 hover:text-danger transition-colors py-2"
+                  >
+                    Pedido falso ou cliente sumiu? Denunciar
+                  </button>
                 </div>
               )}
             </div>
@@ -841,8 +987,9 @@ const RequestDetails = () => {
           {/* Bottom Fixed Action Bar */}
           {!hasUnlocked && (
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 px-6 flex items-center gap-4 z-50 pb-safe">
-              <button 
-                onClick={() => navigate(-1)}
+              <button
+                onClick={handleDismissLead}
+                title="Não tenho interesse"
                 className="w-14 h-14 rounded-full border-2 border-red-200 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0"
               >
                 <Trash2 className="w-6 h-6" />
@@ -869,16 +1016,69 @@ const RequestDetails = () => {
         </div>
       )}
 
-      {/* Aviso de Proposta Enviada */}
-      {user?.role === 'professional' && hasAlreadyProposed && (
+      {/* Aviso quando o pedido já saiu do ar mas o pro chegou a se candidatar */}
+      {user?.role === 'professional' && hasAlreadyProposed && request.status !== 'OPEN' && (
         <div className="bg-success/10 border border-success/20 p-6 rounded-2xl mt-8 flex items-center gap-4">
           <div className="bg-success text-white p-2 rounded-full shrink-0">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
             <h4 className="font-bold text-success-800 text-lg">Mensagem enviada!</h4>
-            <p className="text-success-700 text-sm">Você já enviou uma mensagem para este serviço. Aguarde o cliente entrar em contato com você pelo chat.</p>
+            <p className="text-success-700 text-sm">Você já enviou uma mensagem para este serviço. Acompanhe a conversa pelo chat.</p>
           </div>
+        </div>
+      )}
+
+      {/* Profissional contratado avalia o cliente (serviço concluído) */}
+      {isAcceptedPro && request.status === 'COMPLETED' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4 mt-6">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900">Avaliar o cliente</h2>
+            <p className="text-slate-600 text-sm">Como foi lidar com este cliente? Sua nota ajuda outros profissionais.</p>
+          </div>
+          {existingClientReview ? (
+            <div className="bg-success/10 border border-success/20 p-4 rounded-2xl">
+              <p className="font-bold text-success-800">Avaliação enviada</p>
+              <p className="text-success-700 text-sm mt-1">Nota: {existingClientReview.rating}/5</p>
+              {existingClientReview.comment && <p className="text-success-700 text-sm mt-2">"{existingClientReview.comment}"</p>}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-5 gap-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setCrRating(n)}
+                    className={`py-3 rounded-xl font-bold border transition-all ${
+                      crRating === n ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-200 hover:border-primary/40'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-3 font-bold text-slate-800 cursor-pointer">
+                <input type="checkbox" checked={crSmooth} onChange={(e) => setCrSmooth(e.target.checked)} className="w-5 h-5" />
+                Negociação e pagamento tranquilos
+              </label>
+              <textarea
+                rows={4}
+                className="w-full p-4 border border-slate-300 rounded-xl bg-white text-slate-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                placeholder="Conte como foi a experiência (opcional)"
+                value={crComment}
+                onChange={(e) => setCrComment(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={handleSubmitClientReview}
+                disabled={submittingCr}
+                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-md shadow-primary/20"
+              >
+                {submittingCr ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Enviar avaliação'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1069,16 +1269,42 @@ const RequestDetails = () => {
           )}
         </div>
       )}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            aria-label="Fechar"
+          >
+            <X className="w-7 h-7" />
+          </button>
+          <img
+            src={lightbox}
+            alt="Foto do pedido"
+            className="max-h-full max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <ConfirmModal
         isOpen={isConfirmOpen}
         title={
           confirmAction?.proposalId === 'start' ? 'Iniciar Serviço' :
           confirmAction?.proposalId === 'complete' ? 'Finalizar Serviço' :
+          confirmAction?.proposalId === 'cancel' ? 'Cancelar Pedido' :
+          confirmAction?.proposalId === 'delete' ? 'Excluir Pedido' :
           'Aceitar Profissional'
         }
         message={
           confirmAction?.proposalId === 'start' ? 'Tem certeza que deseja marcar este serviço como Em Andamento?' :
           confirmAction?.proposalId === 'complete' ? 'Tem certeza que deseja finalizar este serviço?' :
+          confirmAction?.proposalId === 'cancel' ? 'Tem certeza que deseja cancelar este pedido? As propostas serão dispensadas. Profissionais que já gastaram diamantes para desbloquear NÃO são reembolsados.' :
+          confirmAction?.proposalId === 'delete' ? 'Excluir o pedido para sempre? Ele some da sua lista junto com as propostas e conversas. Esta ação não pode ser desfeita.' :
           'Tem certeza que deseja fechar negócio com este profissional? Os outros interessados serão dispensados.'
         }
         onConfirm={handleConfirmAction}

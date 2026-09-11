@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
-import { MessageSquare, Loader2, User as UserIcon, ChevronRight } from 'lucide-react';
+import { MessageSquare, Loader2, User as UserIcon } from 'lucide-react';
 import { Link, Outlet, useParams } from 'react-router-dom';
-import { Proposal, ServiceRequest, User, Message } from '@/types';
+import { Proposal, ServiceRequest, PublicProfile, Message } from '@/types';
 
 interface ChatPreview {
   chatId: string;
@@ -24,79 +24,67 @@ const ChatsList = () => {
   useEffect(() => {
     if (!user) return;
 
-    let unsubscribes: (() => void)[] = [];
-    let mainUnsubscribe: (() => void) | undefined;
     setLoading(true);
+    const isClient = user.role === 'client';
 
-    if (user.role === 'client') {
-      const reqQuery = query(collection(db, 'serviceRequests'), where('clientId', '==', user.id));
-      mainUnsubscribe = onSnapshot(reqQuery, (reqSnap) => {
-        const requestIds = reqSnap.docs.map(d => d.id);
-        
-        if (requestIds.length > 0) {
-          const propUnsub = onSnapshot(collection(db, 'proposals'), async (propSnap) => {
-            const clientProposals = propSnap.docs
-              .map(d => d.data() as Proposal)
-              .filter(p => requestIds.includes(p.requestId));
+    // Consulta simétrica: cada lado filtra as propostas pelo próprio id.
+    // (o campo clientId é desnormalizado na proposta na criação)
+    const propQuery = query(
+      collection(db, 'proposals'),
+      where(isClient ? 'clientId' : 'professionalId', '==', user.id)
+    );
 
-            const activeChats: ChatPreview[] = [];
-            for (const prop of clientProposals) {
-              const reqDoc = reqSnap.docs.find(d => d.id === prop.requestId);   
-              const requestTitle = reqDoc ? `${reqDoc.data().subcategory || reqDoc.data().category} para ${reqDoc.data().propertyType}` : 'Serviço';
+    const unsubscribe = onSnapshot(
+      propQuery,
+      async (propSnap) => {
+        const reqCache = new Map<string, ServiceRequest | null>();
+        const userCache = new Map<string, PublicProfile | null>();
 
-              const profDoc = await getDoc(doc(db, 'users', prop.professionalId));
-              const profName = profDoc.exists() ? (profDoc.data() as User).name : (prop.professionalName || 'Profissional');
-              const profPhoto = profDoc.exists() ? (profDoc.data() as User).photo_url || '' : (prop.professionalPhoto || '');
+        const getRequest = async (reqId: string) => {
+          if (!reqCache.has(reqId)) {
+            const snap = await getDoc(doc(db, 'serviceRequests', reqId));
+            reqCache.set(reqId, snap.exists() ? ({ id: snap.id, ...snap.data() } as ServiceRequest) : null);
+          }
+          return reqCache.get(reqId) ?? null;
+        };
+        const getUser = async (userId: string) => {
+          if (!userId) return null;
+          if (!userCache.has(userId)) {
+            const snap = await getDoc(doc(db, 'publicProfiles', userId));
+            userCache.set(userId, snap.exists() ? (snap.data() as PublicProfile) : null);
+          }
+          return userCache.get(userId) ?? null;
+        };
 
-              activeChats.push({
-                chatId: `${prop.requestId}_${prop.professionalId}`,
-                otherUserName: profName,
-                otherUserPhoto: profPhoto,
-                requestTitle,
-                updatedAt: prop.created_at,
-              });
-            }
-            setChats(activeChats.sort((a, b) => b.updatedAt - a.updatedAt));
-            setLoading(false);
-          });
-          unsubscribes.push(propUnsub);
-        } else {
-          setChats([]);
-          setLoading(false);
-        }
-      });
-    } else {
-      const propQuery = query(collection(db, 'proposals'), where('professionalId', '==', user.id));
-      mainUnsubscribe = onSnapshot(propQuery, async (propSnap) => {
         const activeChats: ChatPreview[] = [];
         for (const docSnap of propSnap.docs) {
           const prop = docSnap.data() as Proposal;
+          const reqData = await getRequest(prop.requestId);
+          if (!reqData) continue;
 
-          const reqDoc = await getDoc(doc(db, 'serviceRequests', prop.requestId));
-          if (reqDoc.exists()) {
-            const reqData = reqDoc.data() as ServiceRequest;
-            const clientDoc = await getDoc(doc(db, 'users', reqData.clientId));
-            const clientName = clientDoc.exists() ? (clientDoc.data() as User).name : 'Cliente';
-            const clientPhoto = clientDoc.exists() ? (clientDoc.data() as User).photo_url || '' : '';
+          const otherId = isClient ? prop.professionalId : reqData.clientId;
+          const otherUser = await getUser(otherId);
 
-            activeChats.push({
-              chatId: `${prop.requestId}_${prop.professionalId}`,
-              otherUserName: clientName,
-              otherUserPhoto: clientPhoto,
-              requestTitle: `${reqData.subcategory || reqData.category} para ${reqData.propertyType}`,
-              updatedAt: prop.created_at,
-            });
-          }
+          activeChats.push({
+            chatId: `${prop.requestId}_${prop.professionalId}`,
+            otherUserName:
+              otherUser?.name || (isClient ? prop.professionalName || 'Profissional' : 'Cliente'),
+            otherUserPhoto:
+              otherUser?.photo_url || (isClient ? prop.professionalPhoto || '' : ''),
+            requestTitle: `${reqData.subcategory || reqData.category} para ${reqData.propertyType}`,
+            updatedAt: prop.created_at,
+          });
         }
         setChats(activeChats.sort((a, b) => b.updatedAt - a.updatedAt));
         setLoading(false);
-      });
-    }
+      },
+      (err) => {
+        console.error('Erro ao carregar conversas:', err);
+        setLoading(false);
+      }
+    );
 
-    return () => {
-      if (mainUnsubscribe) mainUnsubscribe();
-      unsubscribes.forEach(unsub => unsub());
-    };
+    return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
@@ -112,9 +100,10 @@ const ChatsList = () => {
           // For MVP, we'll consider it unread if the last message is from the other user and is marked as unread (!read)
           const isUnread = lastMsg.senderId !== user?.id && lastMsg.read === false;
           
+          const preview = lastMsg.type === 'image' && !lastMsg.text ? '📷 Imagem' : lastMsg.text;
           setLastMessages(prev => ({
             ...prev,
-            [chat.chatId]: { text: lastMsg.text, time: lastMsg.created_at, unread: isUnread }
+            [chat.chatId]: { text: preview, time: lastMsg.created_at, unread: isUnread }
           }));
         }
       });

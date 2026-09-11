@@ -1,42 +1,101 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
 import { ServiceRequest } from '@/types';
-import { Loader2, Plus, MapPin, Clock, FileText } from 'lucide-react';
+import { Loader2, Plus, MapPin, Clock, FileText, SlidersHorizontal, ArrowUpDown, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+const PAGE_SIZE = 20;
+
+type StatusFilter = 'all' | ServiceRequest['status'];
+type SortMode = 'recent' | 'oldest';
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'OPEN', label: 'Aguardando propostas' },
+  { value: 'NEGOTIATING', label: 'Em negociação' },
+  { value: 'IN_PROGRESS', label: 'Em andamento' },
+  { value: 'COMPLETED', label: 'Finalizado' },
+  { value: 'CANCELED', label: 'Cancelado' },
+];
+
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: 'recent', label: 'Mais recentes' },
+  { value: 'oldest', label: 'Mais antigos' },
+];
 
 const RequestsList = () => {
   const { user } = useUserStore();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+
+  const fetchPage = useCallback(
+    async (after: QueryDocumentSnapshot<DocumentData> | null) => {
+      if (!user) return;
+      const base = [
+        collection(db, 'serviceRequests'),
+        where('clientId', '==', user.id),
+        orderBy('created_at', 'desc'),
+        limit(PAGE_SIZE),
+      ] as const;
+      const q = after ? query(...base, startAfter(after)) : query(...base);
+      const snap = await getDocs(q);
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceRequest));
+      setRequests((prev) => (after ? [...prev, ...data] : data));
+      setCursor(snap.docs[snap.docs.length - 1] ?? after);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    },
+    [user]
+  );
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      if (!user) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
       try {
-        const q = query(
-          collection(db, 'serviceRequests'),
-          where('clientId', '==', user.id)
-        );
-        const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRequest));
-        
-        // Ordenação feita no frontend para não exigir a criação de Índices no Firebase
-        data.sort((a, b) => b.created_at - a.created_at);
-        
-        setRequests(data);
+        if (active) await fetchPage(null);
       } catch (error) {
         console.error('Erro ao buscar solicitações:', error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
+    })();
+    return () => {
+      active = false;
     };
+  }, [fetchPage]);
 
-    fetchRequests();
-  }, [user]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      await fetchPage(cursor);
+    } catch (error) {
+      console.error('Erro ao carregar mais solicitações:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,6 +118,10 @@ const RequestsList = () => {
       default: return status;
     }
   };
+
+  const visibleRequests = requests
+    .filter((r) => statusFilter === 'all' || r.status === statusFilter)
+    .sort((a, b) => (sortMode === 'recent' ? b.created_at - a.created_at : a.created_at - b.created_at));
 
   if (loading) {
     return (
@@ -84,6 +147,30 @@ const RequestsList = () => {
         </Link>
       </div>
 
+      {requests.length > 0 && (
+        <div className="flex items-center flex-wrap gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setFilterOpen(true)}
+            className="relative flex-shrink-0 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <SlidersHorizontal className="w-4 h-4" /> Filtrar
+            {statusFilter !== 'all' && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                1
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOpen(true)}
+            className="flex-shrink-0 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <ArrowUpDown className="w-4 h-4" /> Ordenar
+          </button>
+        </div>
+      )}
+
       {requests.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center shadow-sm">
           <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -93,16 +180,29 @@ const RequestsList = () => {
           <p className="text-slate-500 mb-6 max-w-md mx-auto">
             Você ainda não criou nenhuma solicitação de serviço. Que tal publicar a sua primeira necessidade agora?
           </p>
-          <Link 
-            to="/request/new" 
+          <Link
+            to="/request/new"
             className="inline-flex bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-colors"
           >
             Criar Solicitação
           </Link>
         </div>
+      ) : visibleRequests.length === 0 ? (
+        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center shadow-sm">
+          <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <SlidersHorizontal className="w-10 h-10 text-slate-400" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Nenhum pedido com esse filtro</h2>
+          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+            Você tem pedidos, mas nenhum está no status escolhido.
+          </p>
+          <button onClick={() => setStatusFilter('all')} className="text-primary font-bold hover:underline">
+            Limpar filtro
+          </button>
+        </div>
       ) : (
         <div className="grid gap-4">
-          {requests.map(request => (
+          {visibleRequests.map(request => (
             <Link 
               key={request.id} 
               to={`/requests/${request.id}`}
@@ -136,6 +236,94 @@ const RequestsList = () => {
               </div>
             </Link>
           ))}
+
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mx-auto mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {loadingMore ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Carregar mais'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Filtrar */}
+      {filterOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setFilterOpen(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-extrabold text-slate-900">Filtrar por status</h2>
+              <button onClick={() => setStatusFilter('all')} className="text-sm font-bold text-primary hover:underline">
+                Limpar
+              </button>
+            </div>
+            <div className="p-6 space-y-2">
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setStatusFilter(opt.value);
+                    setFilterOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border text-left font-bold transition-colors ${
+                    statusFilter === opt.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {opt.label}
+                  {statusFilter === opt.value && <Check className="w-5 h-5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ordenar */}
+      {sortOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setSortOpen(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-extrabold text-slate-900">Ordenar por</h2>
+              <button onClick={() => setSortOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-2">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setSortMode(opt.value);
+                    setSortOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border text-left font-bold transition-colors ${
+                    sortMode === opt.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {opt.label}
+                  {sortMode === opt.value && <Check className="w-5 h-5" />}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

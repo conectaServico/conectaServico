@@ -1,99 +1,274 @@
 rules_version = '2';
+
+// Regras de produção.
+// Princípio: o cliente só escreve o que é dele e NUNCA campos controlados pelo servidor
+// (saldo, nota, verificação, unlockCount, status de proposta "accepted", transações, unlocks).
+// Esses campos são gravados exclusivamente pelas Cloud Functions (Admin SDK, que ignora estas regras).
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Funções auxiliares para segurança
-    function isAuthenticated() {
+
+    // ---------- helpers ----------
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
-
-    function isClientOwnerOfRequest(requestId) {
-      return isAuthenticated()
-        && get(/databases/$(database)/documents/serviceRequests/$(requestId)).data.clientId == request.auth.uid;
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
     }
-
-    // Regras para a coleção de usuários
-    match /users/{userId} {
-      // Qualquer usuário logado pode ler perfis (necessário para ver quem postou o job ou quem fez a proposta)
-      allow read: if isAuthenticated();
-      // Apenas o próprio dono pode criar/editar seus dados
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || (isAuthenticated() && request.resource.data.diff(resource.data).changedKeys().hasOnly(['coinsBalance']));
-      // Deleção pode ser bloqueada ou permitida apenas pelo dono
-      allow delete: if isOwner(userId);
-    }
-
-    // Regras para a coleção de serviços (Jobs)
-    match /serviceRequests/{requestId} {
-      // Qualquer usuário autenticado pode ver a lista de jobs
-      allow read: if isAuthenticated();
-      // Qualquer usuário logado pode criar um job (o app vai garantir que o clientId seja o dele)
-      allow create: if isAuthenticated() && request.resource.data.clientId == request.auth.uid;
-      // Apenas o cliente dono do job pode editá-lo ou deletá-lo
-      allow update: if isAuthenticated() && (
-        resource.data.clientId == request.auth.uid ||
-        request.resource.data.diff(resource.data).changedKeys().hasOnly(['unlockCount'])
-      );
-      allow delete: if isAuthenticated() && resource.data.clientId == request.auth.uid;
-    }
-
-    // Regras para a coleção de propostas (Proposals)
-    match /proposals/{proposalId} {
-      // Leitura: O dono da proposta OU o cliente dono do job podem ler
-      allow read: if isAuthenticated();
-      // Criação: O profissional deve definir seu próprio ID na proposta
-      allow create: if isAuthenticated() && request.resource.data.professionalId == request.auth.uid;
-      // Atualização/Deleção:
-      // - Profissional pode atualizar/deletar a própria proposta
-      // - Cliente dono do job pode atualizar apenas o status (accepted/rejected)
-      allow update: if isAuthenticated()
+    // Contato verificado — porta de entrada para ações sensíveis (publicar pedido,
+    // propor, avaliar, conversar). Cliente: e-mail + telefone confirmados. Profissional:
+    // conta só de telefone (o próprio login por SMS já é a verificação).
+    function isVerified() {
+      return isSignedIn()
+        && request.auth.token.phone_number is string
         && (
-          resource.data.professionalId == request.auth.uid
-          || (
-            isClientOwnerOfRequest(resource.data.requestId)
-            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'accepted_at', 'updated_at'])
-            && (request.resource.data.status in ['accepted', 'rejected'])
-          )
+          request.auth.token.email_verified == true
+          || request.auth.token.firebase.sign_in_provider == 'phone'
         );
-      allow delete: if isAuthenticated() && resource.data.professionalId == request.auth.uid;
     }
-
-    // Regras para o Chat (Messages)
-    match /messages/{messageId} {
-      allow read: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid ||
-        // Verifica se o usuário é participante do chat (assumindo que o chatId contém os IDs, ex: reqId_profId)
-        resource.data.chatId.matches('.*' + request.auth.uid + '.*') ||
-        // Backup: se não usar chatId com IDs, permite ler se for o dono da mensagem (mas o ideal é ter participants)
-        // Por enquanto, permitimos leitura se autenticado (MVP), mas restrito à criação pelo próprio sender
-        true // MVP - Permitir leitura para evitar quebra, já que a query filtra no client. Em prod, usar array participants
+    function incoming() {
+      return request.resource.data;
+    }
+    function affected() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    function requestData(reqId) {
+      return get(/databases/$(database)/documents/serviceRequests/$(reqId)).data;
+    }
+    // chatId tem o formato "<requestId>_<professionalId>"
+    function chatReqId(chatId) {
+      return chatId.split('_')[0];
+    }
+    function chatProId(chatId) {
+      return chatId.split('_')[1];
+    }
+    function isChatParticipant(chatId) {
+      return isSignedIn() && (
+        request.auth.uid == chatProId(chatId) ||
+        requestData(chatReqId(chatId)).clientId == request.auth.uid
       );
-      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
-      allow update: if isAuthenticated(); // MVP: Permite que o destinatário marque a mensagem como lida
     }
 
-    // Regras para Avaliações (Reviews)
+    // ---------- users (dados privados: telefone, e-mail, endereço, saldo) ----------
+    match /users/{userId} {
+      // Só o dono e o admin. O resto do app usa /publicProfiles.
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isOwner(userId)
+        && incoming().id == userId
+        && incoming().get('coinsBalance', 0) == 0
+        && incoming().get('verified', false) == false
+        && incoming().get('rating', 0) == 0
+        && incoming().get('reviewCount', 0) == 0
+        && incoming().get('isAdmin', false) == false
+        && incoming().role in ['client', 'professional']
+        && incoming().termsAcceptedAt is number;
+
+      // Dono edita o próprio perfil, menos os campos controlados pelo servidor.
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && !affected().hasAny([
+          'coinsBalance', 'rating', 'ratingSum', 'reviewCount',
+          'clientRating', 'clientRatingSum', 'clientReviewCount',
+          'verified', 'isAdmin', 'id', 'role', 'created_at',
+          'referredBy', 'referralRewarded', 'referralCount', 'contactsVerified'
+        ])
+      );
+
+      allow delete: if false;
+    }
+
+    // Leads que o profissional escondeu do próprio feed ("não tenho interesse").
+    match /users/{userId}/dismissedLeads/{requestId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Central de avisos in-app (escrita só por Function; o dono lê e marca como lido).
+    match /users/{userId}/notifications/{notifId} {
+      allow read: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read == true;
+      allow create, delete: if false;
+    }
+
+    // ---------- serviceRequests ----------
+    match /serviceRequests/{requestId} {
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(incoming().clientId)
+        && isVerified()
+        && incoming().status in ['OPEN', 'NEGOTIATING']
+        && incoming().get('unlockCount', 0) == 0
+        && !('acceptedProfessionalId' in incoming())
+        && !('acceptedProposalId' in incoming())
+        && incoming().description is string
+        && incoming().description.size() >= 20
+        && incoming().description.size() <= 5000
+        && incoming().category is string
+        && incoming().category.size() <= 120;
+
+      // Só o cliente dono, e só campos editáveis (descrição, urgência, fotos…).
+      // status / aceite / contadores / carimbos são exclusivos das Functions.
+      allow update: if isSignedIn()
+        && resource.data.clientId == request.auth.uid
+        && !affected().hasAny([
+          'status', 'unlockCount', 'clientId', 'created_at',
+          'acceptedProfessionalId', 'acceptedProposalId',
+          'started_at', 'completed_at', 'canceled_at', 'cancelReason'
+        ]);
+
+      // A exclusão passa pela Function deleteRequest (limpa propostas/unlocks/chat).
+      allow delete: if false;
+    }
+
+    // ---------- proposals ----------
+    match /proposals/{proposalId} {
+      allow read: if isSignedIn();
+
+      // O profissional cria a própria proposta, sempre como "pending".
+      // (a proposta de "orçamento direto" já aceita é criada por Function)
+      allow create: if isVerified()
+        && incoming().professionalId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().requestId is string
+        && incoming().clientId is string
+        && incoming().get('message', '').size() <= 3000;
+
+      // O profissional dono ajusta a própria proposta, menos o status/aceite.
+      allow update: if isSignedIn()
+        && resource.data.professionalId == request.auth.uid
+        && !affected().hasAny([
+          'status', 'professionalId', 'clientId', 'requestId',
+          'created_at', 'accepted_at'
+        ]);
+
+      allow delete: if isSignedIn()
+        && resource.data.professionalId == request.auth.uid
+        && resource.data.status != 'accepted';
+    }
+
+    // ---------- messages ----------
+    match /messages/{messageId} {
+      allow read: if isChatParticipant(resource.data.chatId);
+
+      allow create: if isVerified()
+        && incoming().senderId == request.auth.uid
+        && isChatParticipant(incoming().chatId)
+        && incoming().get('text', '').size() <= 5000;
+
+      // Só o destinatário, só para marcar como lida.
+      allow update: if isSignedIn()
+        && affected().hasOnly(['read'])
+        && incoming().read == true
+        && resource.data.senderId != request.auth.uid
+        && isChatParticipant(resource.data.chatId);
+
+      allow delete: if false;
+    }
+
+    // ---------- reviews ----------
+    // id determinístico: "<requestId>_<clientId>" (garante 1 avaliação por pedido/cliente)
     match /reviews/{reviewId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.clientId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.clientId == request.auth.uid;
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(incoming().clientId)
+        && isVerified()
+        && reviewId == incoming().requestId + '_' + incoming().clientId
+        && incoming().rating is number
+        && incoming().rating >= 1 && incoming().rating <= 5
+        && incoming().get('comment', '').size() <= 3000
+        && requestData(incoming().requestId).clientId == request.auth.uid
+        && requestData(incoming().requestId).status == 'COMPLETED'
+        && requestData(incoming().requestId).acceptedProfessionalId == incoming().professionalId;
+
+      allow update, delete: if false;
     }
 
-    // Regras para o Sistema de Moedas / Diamantes
+    // ---------- clientReviews (o profissional avalia o cliente) ----------
+    // id determinístico: "<requestId>_<professionalId>"
+    match /clientReviews/{reviewId} {
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(incoming().professionalId)
+        && isVerified()
+        && reviewId == incoming().requestId + '_' + incoming().professionalId
+        && incoming().rating is number
+        && incoming().rating >= 1 && incoming().rating <= 5
+        && incoming().get('comment', '').size() <= 3000
+        && requestData(incoming().requestId).acceptedProfessionalId == request.auth.uid
+        && requestData(incoming().requestId).status == 'COMPLETED'
+        && requestData(incoming().requestId).clientId == incoming().clientId;
+
+      allow update, delete: if false;
+    }
+
+    // ---------- unlocks (só Function) ----------
     match /unlocks/{unlockId} {
-      allow read: if isAuthenticated();
-      // O profissional deve ser o dono do desbloqueio
-      allow create: if isAuthenticated() && request.resource.data.professionalId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
+    // ---------- transactions (só Function) ----------
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated();
-      // Em produção, isso seria restrito apenas ao backend. Para o MVP:
-      allow create: if isAuthenticated();
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------- payments (Mercado Pago) — criado/atualizado só por Function/webhook ----------
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------- supportTickets (suporte / disputas) ----------
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn()
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().category in ['fake_lead', 'no_show', 'abusive', 'payment', 'app_error', 'other']
+        && incoming().message is string
+        && incoming().message.size() >= 10
+        && incoming().message.size() <= 5000
+        && incoming().subject is string
+        && incoming().subject.size() <= 200;
+
+      // Resolução/resposta é só via Function resolveSupportTicket.
+      allow update, delete: if false;
+    }
+
+    // ---------- validations (KYC) ----------
+    match /validations/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isOwner(userId)
+        && incoming().userId == userId
+        && incoming().status == 'pending';
+
+      // Reenvio pelo dono após recusa, ou ação do admin.
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && incoming().status == 'pending'
+        && resource.data.status == 'rejected'
+      );
+
+      allow delete: if false;
+    }
+
+    // ---------- publicProfiles (projeção segura, mantida pela Function syncPublicProfile) ----------
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ---------- default deny ----------
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

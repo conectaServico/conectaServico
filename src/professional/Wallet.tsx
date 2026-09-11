@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, doc, writeBatch, increment } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { simulatePurchaseFn, createPaymentPreferenceFn, callableErrorMessage } from '@/services/api';
 import { useUserStore } from '@/store/userStore';
-import { Transaction } from '@/types';
+import { useVerified } from '@/hooks/useVerified';
+import { useNavigate } from 'react-router-dom';
+import { Payment, Transaction, User } from '@/types';
 import { Coins, ArrowUpRight, ArrowDownRight, Loader2, CreditCard, Gift, ShieldAlert, X, CheckCircle2, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -14,8 +17,13 @@ const DIAMOND_PACKAGES = [
   { id: 'pkg_300', diamonds: 300, price: 49.90, popular: false },
 ];
 
+// Com a chave pública do Mercado Pago definida, usamos o checkout real; senão, o simulado.
+const MP_ENABLED = !!import.meta.env.VITE_MP_PUBLIC_KEY;
+
 const Wallet = () => {
   const { user, setUser } = useUserStore();
+  const { verified } = useVerified();
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,31 +33,72 @@ const Wallet = () => {
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+
+  const reloadTransactions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(collection(db, 'transactions'), where('userId', '==', user.id));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Transaction));
+      data.sort((a, b) => b.created_at - a.created_at);
+      setTransactions(data);
+    } catch (error) {
+      console.error('Erro ao buscar transações:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!user) return;
-      try {
-        const q = query(
-          collection(db, 'transactions'),
-          where('userId', '==', user.id)
-        );
-        const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-        
-        // Sort frontend (no index needed)
-        data.sort((a, b) => b.created_at - a.created_at);
-        
-        setTransactions(data);
-      } catch (error) {
-        console.error('Erro ao buscar transações:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    reloadTransactions();
+  }, [reloadTransactions]);
 
-    fetchTransactions();
-  }, [user]);
+  // Volta do checkout do Mercado Pago (?payment=success&external_reference=<paymentId>).
+  // O saldo é creditado pelo webhook — aqui só acompanhamos o doc payments/{id} até confirmar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payParam = params.get('payment');
+    if (!payParam) return;
+
+    const ref = params.get('external_reference');
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    if (payParam === 'failure') {
+      toast.error('Pagamento não concluído.');
+      return;
+    }
+    if (!ref) return;
+
+    setConfirmingPayment(true);
+    const unsub = onSnapshot(doc(db, 'payments', ref), async (snap) => {
+      if (!snap.exists()) return;
+      const p = snap.data() as Payment;
+      if (p.status === 'approved') {
+        unsub();
+        setConfirmingPayment(false);
+        toast.success('Pagamento aprovado! Diamantes creditados.');
+        const uSnap = await getDoc(doc(db, 'users', p.userId));
+        if (uSnap.exists()) setUser(uSnap.data() as User);
+        reloadTransactions();
+      } else if (['rejected', 'cancelled', 'error'].includes(p.status)) {
+        unsub();
+        setConfirmingPayment(false);
+        toast.error('Pagamento não aprovado.');
+      }
+    });
+
+    const timeout = setTimeout(() => {
+      unsub();
+      setConfirmingPayment(false);
+    }, 90000);
+
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -79,36 +128,34 @@ const Wallet = () => {
   };
 
   const handleCheckout = async () => {
-    if (!user || !selectedPackage || !paymentMethod) return;
+    if (!user || !selectedPackage) return;
+    if (!verified) {
+      toast.error('Confirme seu e-mail e telefone para comprar diamantes.');
+      navigate('/verify');
+      return;
+    }
+    if (!MP_ENABLED && !paymentMethod) return;
     setProcessingPayment(true);
-    
-    // Simulate Gateway Payment Delay (Mercado Pago / Stripe)
-    await new Promise(resolve => setTimeout(resolve, 2500));
 
     try {
-      const batch = writeBatch(db);
-      
-      // Update User Balance
-      const userRef = doc(db, 'users', user.id);
-      batch.update(userRef, { coinsBalance: increment(selectedPackage.diamonds) });
+      if (MP_ENABLED) {
+        // Checkout Pro: o servidor cria a preferência; o saldo entra depois, via webhook.
+        const { data } = await createPaymentPreferenceFn({
+          packageId: selectedPackage.id,
+          origin: window.location.origin,
+        });
+        if (!data.initPoint) throw new Error('Não foi possível iniciar o checkout.');
+        window.location.assign(data.initPoint);
+        return;
+      }
 
-      // Add Transaction
-      const txRef = doc(collection(db, 'transactions'));
-      const newTx: Omit<Transaction, 'id'> = {
-        userId: user.id,
-        amount: selectedPackage.diamonds,
-        type: 'PURCHASE',
-        description: `Compra de Pacote: ${selectedPackage.diamonds} Diamantes via ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
-        created_at: Date.now()
-      };
-      batch.set(txRef, newTx);
-
-      await batch.commit();
-
-      // Update Local State
-      setUser({ ...user, coinsBalance: (user.coinsBalance || 0) + selectedPackage.diamonds });
-      setTransactions(prev => [{ id: txRef.id, ...newTx } as Transaction, ...prev].sort((a, b) => b.created_at - a.created_at));
-      
+      // Fallback simulado (staging — ALLOW_SIMULATED_PAYMENTS=true na Function)
+      const { data } = await simulatePurchaseFn({
+        packageId: selectedPackage.id,
+        method: paymentMethod!,
+      });
+      setUser({ ...user, coinsBalance: (user.coinsBalance || 0) + data.diamonds });
+      await reloadTransactions();
       setPaymentSuccess(true);
       toast.success('Diamantes adicionados com sucesso!');
       setTimeout(() => {
@@ -117,10 +164,9 @@ const Wallet = () => {
         setSelectedPackage(null);
         setPaymentMethod(null);
       }, 3000);
-
     } catch (err) {
       console.error('Erro na compra:', err);
-      toast.error('Erro ao processar o pagamento.');
+      toast.error(callableErrorMessage(err, 'Erro ao processar o pagamento.'));
     } finally {
       setProcessingPayment(false);
     }
@@ -130,6 +176,14 @@ const Wallet = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-10">
+      {confirmingPayment && (
+        <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4">
+          <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0" />
+          <p className="text-sm font-medium text-slate-700">
+            Confirmando seu pagamento no Mercado Pago… os diamantes entram assim que for aprovado.
+          </p>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row gap-6">
         {/* Saldo Atual */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-xl flex-1 relative overflow-hidden">
@@ -209,8 +263,8 @@ const Wallet = () => {
       {/* Loja de Diamantes Modal (Gateway Simulator) */}
       {isStoreOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 flex-shrink-0">
               <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
                 <Coins className="w-6 h-6 text-primary" /> Loja de Diamantes
               </h2>
@@ -221,7 +275,7 @@ const Wallet = () => {
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               {paymentSuccess ? (
                 <div className="text-center py-10 space-y-4">
                   <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto text-success mb-6">
@@ -293,33 +347,48 @@ const Wallet = () => {
                         </div>
                       </div>
 
-                      <h4 className="font-bold text-slate-900 mb-3">Forma de Pagamento</h4>
-                      <div className="grid grid-cols-2 gap-3 mb-8">
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod('pix')}
-                          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2 ${
-                            paymentMethod === 'pix' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                          }`}
-                        >
-                          <QrCode className={`w-8 h-8 ${paymentMethod === 'pix' ? 'text-emerald-500' : 'text-slate-400'}`} />
-                          <span className="font-bold text-sm">PIX (Aprovação na hora)</span>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod('credit_card')}
-                          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2 ${
-                            paymentMethod === 'credit_card' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                          }`}
-                        >
-                          <CreditCard className={`w-8 h-8 ${paymentMethod === 'credit_card' ? 'text-primary' : 'text-slate-400'}`} />
-                          <span className="font-bold text-sm">Cartão de Crédito</span>
-                        </button>
-                      </div>
+                      {MP_ENABLED ? (
+                        <div className="flex items-start gap-3 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 mb-8">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <ShieldAlert className="w-5 h-5 text-primary" />
+                          </div>
+                          <p className="text-sm text-slate-600 leading-relaxed">
+                            Você será levado ao <strong className="text-slate-900">Mercado Pago</strong> para
+                            pagar com PIX, cartão ou boleto. Os diamantes entram na carteira assim que o
+                            pagamento for confirmado.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <h4 className="font-bold text-slate-900 mb-3">Forma de Pagamento</h4>
+                          <div className="grid grid-cols-2 gap-3 mb-8">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentMethod('pix')}
+                              className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2 ${
+                                paymentMethod === 'pix' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                              }`}
+                            >
+                              <QrCode className={`w-8 h-8 ${paymentMethod === 'pix' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                              <span className="font-bold text-sm">PIX (Aprovação na hora)</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setPaymentMethod('credit_card')}
+                              className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all gap-2 ${
+                                paymentMethod === 'credit_card' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                              }`}
+                            >
+                              <CreditCard className={`w-8 h-8 ${paymentMethod === 'credit_card' ? 'text-primary' : 'text-slate-400'}`} />
+                              <span className="font-bold text-sm">Cartão de Crédito</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
 
                       <div className="flex gap-3">
-                        <button 
+                        <button
                           onClick={() => {
                             setSelectedPackage(null);
                             setPaymentMethod(null);
@@ -328,12 +397,14 @@ const Wallet = () => {
                         >
                           Voltar
                         </button>
-                        <button 
+                        <button
                           onClick={handleCheckout}
-                          disabled={!paymentMethod}
+                          disabled={!MP_ENABLED && !paymentMethod}
                           className="flex-1 bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex justify-center items-center gap-2"
                         >
-                          Pagar R$ {selectedPackage.price.toFixed(2).replace('.', ',')}
+                          {MP_ENABLED
+                            ? `Pagar R$ ${selectedPackage.price.toFixed(2).replace('.', ',')} no Mercado Pago`
+                            : `Pagar R$ ${selectedPackage.price.toFixed(2).replace('.', ',')}`}
                         </button>
                       </div>
                     </div>

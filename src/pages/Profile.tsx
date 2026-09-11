@@ -1,21 +1,29 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
-import { Loader2, Camera, ShieldCheck, AlertCircle, CheckCircle2, User as UserIcon, Trash2, Upload, Image as ImageIcon, Briefcase, FileText, BookOpen, Users, HelpCircle, FileSignature, LogOut, Link as LinkIcon, MapPin, Star, ChevronRight, ChevronLeft, ListOrdered } from 'lucide-react';
+import { Loader2, Camera, ShieldCheck, AlertCircle, CheckCircle2, User as UserIcon, Trash2, Upload, Briefcase, FileText, HelpCircle, FileSignature, LogOut, ChevronRight, ChevronLeft, ListOrdered } from 'lucide-react';
 import { maskPhone, maskCEP } from '@/utils/masks';
+import { buildGeoFields } from '@/utils/geo';
+import { analyzeFacePhoto, preloadFaceApi, descriptorsMatch } from '@/utils/faceCheck';
+import { deleteMyAccountFn, callableErrorMessage } from '@/services/api';
 import { Review } from '@/types';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
-import * as faceapi from 'face-api.js';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Profile = () => {
   const { user, setUser } = useUserStore();
+  const navigate = useNavigate();
   const [view, setView] = useState<'menu' | 'edit'>('menu');
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState(user?.photo_url || '');
+  const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
   const [phone, setPhone] = useState(user?.phone || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [cep, setCep] = useState(user?.cep || '');
   const [city, setCity] = useState(user?.city || '');
   const [stateUF, setStateUF] = useState(user?.state || '');
@@ -40,17 +48,30 @@ const Profile = () => {
     return { count: reviews.length, avg: sum / reviews.length };
   }, [reviews]);
 
+  // Alternar entre "menu" e "editar" volta o scroll para o topo.
   useEffect(() => {
-    // Carregar os modelos do face-api.js quando o componente for montado
-    const loadModels = async () => {
-      try {
-        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-      } catch (err) {
-        console.error("Erro ao carregar modelos do face-api:", err);
-      }
-    };
-    loadModels();
-  }, []);
+    window.scrollTo(0, 0);
+  }, [view]);
+
+  useEffect(() => {
+    // Pré-aquece o face-api.js só para profissionais (quem passa pela validação de
+    // rosto na troca de foto). Clientes nunca baixam esse chunk.
+    if (user?.role !== 'professional') return;
+    preloadFaceApi().catch((err) => console.error('Erro ao carregar face-api:', err));
+  }, [user?.role]);
+
+  // Descritor do rosto do documento já enviado (se houver) — para checar que a nova
+  // foto de perfil é da mesma pessoa do documento.
+  const [docFaceDescriptor, setDocFaceDescriptor] = useState<number[] | null>(null);
+  useEffect(() => {
+    if (!user?.id || user.role !== 'professional') return;
+    getDoc(doc(db, 'validations', user.id))
+      .then((snap) => {
+        const d = snap.exists() ? snap.data()?.faceDescriptor : null;
+        if (Array.isArray(d) && d.length === 128) setDocFaceDescriptor(d as number[]);
+      })
+      .catch(() => undefined);
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!user?.id || user.role !== 'professional') return;
@@ -94,50 +115,52 @@ const Profile = () => {
   };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const file = e.target.files[0];
-      
-      // Criar URL provisória para exibir a imagem e processar na IA
-      const imageUrl = URL.createObjectURL(file);
-      
-      if (user?.role === 'professional') {
-        setFaceLoading(true);
-        try {
-          // Criar elemento de imagem em memória
-          const img = document.createElement('img');
-          img.src = imageUrl;
-          
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-          });
+    const file = e.target.files?.[0];
+    // limpa o input para permitir re-selecionar o mesmo arquivo depois
+    e.target.value = '';
+    if (!file) return;
 
-          // Detectar rostos usando o modelo ssdMobilenetv1 (mais preciso que o tiny)
-          const detections = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }));
-          
-          if (detections.length === 0) {
-            toast.error("Nenhum rosto humano detectado. Por favor, envie uma foto nítida do seu rosto.");
-            setFaceLoading(false);
-            return;
-          }
-          
-          if (detections.length > 1) {
-            toast.error("Mais de um rosto detectado. A foto de perfil deve ser apenas sua.");
-            setFaceLoading(false);
-            return;
-          }
-          
-          toast.success("Rosto validado com sucesso!");
-        } catch (err) {
-          console.error("Erro na detecção facial:", err);
-          // Em caso de erro na IA, permitimos o upload mas avisamos
-          toast.error("Não foi possível validar o rosto automaticamente, mas a foto será enviada para análise.");
-        }
+    // Profissional: a foto precisa ser uma selfie válida E, se já enviou documento,
+    // ser da MESMA pessoa do documento. Falha fechada.
+    if (user?.role === 'professional') {
+      setFaceLoading(true);
+      const res = await analyzeFacePhoto(file);
+      if (!res.ok) {
         setFaceLoading(false);
+        toast.error(res.reason);
+        return;
       }
 
-      setPhoto(file);
-      setPreview(imageUrl);
+      if (docFaceDescriptor) {
+        const cmp = descriptorsMatch(res.descriptor, docFaceDescriptor);
+        if (cmp && !cmp.match) {
+          setFaceLoading(false);
+          toast.error('Esta foto não confere com o rosto do documento que você enviou.');
+          return;
+        }
+      }
+
+      setFaceLoading(false);
+      setFaceDescriptor(res.descriptor);
+      toast.success('Rosto validado.');
+    }
+
+    setPhoto(file);
+    setPreview(URL.createObjectURL(file));
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm.trim().toUpperCase() !== 'EXCLUIR') return;
+    setDeleting(true);
+    try {
+      await deleteMyAccountFn({});
+      toast.success('Conta excluída.');
+      useUserStore.getState().logout();
+      navigate('/', { replace: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(callableErrorMessage(err, 'Não foi possível excluir a conta. Tente novamente.'));
+      setDeleting(false);
     }
   };
 
@@ -181,20 +204,37 @@ const Profile = () => {
         }
       }
 
+      // Localização normalizada — mantém uf/cityKey/lat/lng/geohash em dia para a
+      // busca por raio. Não bloqueia o salvamento se o geocode falhar.
+      const geo = await buildGeoFields({ cep, uf: stateUF, city });
+
       const updates: any = {
         photo_url: photoUrl,
         phone,
         cep,
         city,
         state: stateUF,
-        neighborhood
+        neighborhood,
+        ...geo,
       };
 
       if (user.role === 'professional') {
         updates.radiusKm = Number(radiusKm) || 10;
+        // E-mail opcional (recuperação de acesso + recibo de pagamento). Não é login.
+        const trimmedEmail = email.trim().toLowerCase();
+        if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+          setError('Digite um e-mail válido ou deixe o campo em branco.');
+          setLoading(false);
+          return;
+        }
+        updates.email = trimmedEmail;
         // Não apagar os serviços (array) já existentes no banco
         if (user.services) {
           updates.services = user.services;
+        }
+        // Descritor da nova foto (para o match com o documento no KYC)
+        if (photo && faceDescriptor) {
+          updates.faceDescriptor = faceDescriptor;
         }
       }
 
@@ -395,6 +435,58 @@ const Profile = () => {
               </div>
             </div>
           )}
+
+          {/* Excluir conta (LGPD / exigência das lojas) */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => { setShowDelete(true); setDeleteConfirm(''); }}
+              className="text-sm font-bold text-danger hover:underline"
+            >
+              Excluir minha conta
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showDelete && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={() => !deleting && setShowDelete(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Excluir minha conta</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Esta ação é <strong>permanente</strong>. Apagamos seu perfil, foto, documentos e
+              pedidos/propostas em aberto. Registros financeiros e avaliações são mantidos de forma
+              anônima por obrigação legal. Você será desconectado.
+            </p>
+            <label className="block text-sm font-bold text-slate-700 mt-4 mb-1">
+              Digite <span className="text-danger">EXCLUIR</span> para confirmar
+            </label>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 outline-none focus:ring-2 focus:ring-danger focus:border-transparent"
+              placeholder="EXCLUIR"
+            />
+            <div className="flex gap-3 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowDelete(false)}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR'}
+                className="flex-1 py-3 rounded-xl font-bold text-white bg-danger hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Excluir'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -538,24 +630,45 @@ const Profile = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="block text-sm font-bold text-slate-700">E-mail</label>
+              <label className="block text-sm font-bold text-slate-700">
+                E-mail {user?.role === 'professional' && <span className="font-normal text-slate-400">(opcional)</span>}
+              </label>
               <input
                 type="email"
-                disabled
-                className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-400 cursor-not-allowed"
-                value={user?.email}
+                disabled={user?.role !== 'professional'}
+                className={`w-full p-3.5 border rounded-xl outline-none transition-all ${
+                  user?.role === 'professional'
+                    ? 'border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent'
+                    : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                }`}
+                value={user?.role === 'professional' ? email : user?.email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
               />
+              {user?.role === 'professional' && (
+                <p className="text-xs text-slate-500">
+                  Serve para recuperar seu acesso e para o recibo de pagamento. Não é usado para entrar.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
               <label className="block text-sm font-bold text-slate-700">Telefone / Celular</label>
               <input
                 type="text"
-                className="w-full p-3.5 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                disabled={user?.role === 'professional'}
+                className={`w-full p-3.5 border rounded-xl outline-none transition-all ${
+                  user?.role === 'professional'
+                    ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                    : 'border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent'
+                }`}
                 value={phone}
                 onChange={(e) => setPhone(maskPhone(e.target.value))}
                 placeholder="(00) 00000-0000"
               />
+              {user?.role === 'professional' && (
+                <p className="text-xs text-slate-500">É o número do seu login. Para trocar, fale com o suporte.</p>
+              )}
             </div>
           </div>
 

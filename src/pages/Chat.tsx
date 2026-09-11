@@ -4,8 +4,10 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, doc } from 'fi
 import { db } from '@/services/firebase';
 import { Message } from '@/types';
 import { useUserStore } from '@/store/userStore';
-import { Send, Loader2, User as UserIcon, ShieldCheck, ChevronLeft, Image as ImageIcon } from 'lucide-react';
+import { uploadImage } from '@/utils/images';
+import { Send, Loader2, User as UserIcon, ChevronLeft, ImagePlus, X } from 'lucide-react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 const Chat = () => {
   const { chatId } = useParams<{ chatId: string }>();
@@ -17,7 +19,10 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!chatId || !user) return;
@@ -59,6 +64,7 @@ const Chat = () => {
       await addDoc(collection(db, 'messages'), {
         chatId: chatId,
         senderId: user.id,
+        type: 'text',
         text: newMessage.trim(),
         created_at: Date.now(),
         read: false,
@@ -66,6 +72,29 @@ const Chat = () => {
       setNewMessage('');
     } catch (err) {
       console.error('Error sending message:', err);
+    }
+  };
+
+  const handleSendImage = async (file: File | undefined) => {
+    if (!file || !user || !chatId) return;
+    if (!file.type.startsWith('image/')) return;
+    setUploadingImage(true);
+    try {
+      const url = await uploadImage(file, `chatImages/${user.id}`);
+      await addDoc(collection(db, 'messages'), {
+        chatId,
+        senderId: user.id,
+        type: 'image',
+        text: '',
+        imageUrl: url,
+        created_at: Date.now(),
+        read: false,
+      });
+    } catch (err) {
+      console.error('Error sending image:', err);
+      toast.error('Não foi possível enviar a imagem.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -126,13 +155,26 @@ const Chat = () => {
                 )}
                 {!isMe && !showAvatar && <div className="w-8 hidden sm:block"></div>}
                 
-                <div className={`max-w-[75%] p-3.5 rounded-2xl text-[15px] shadow-sm ${
-                  isMe 
-                    ? 'bg-primary text-white rounded-br-sm' 
+                <div className={`max-w-[75%] rounded-2xl text-[15px] shadow-sm overflow-hidden ${
+                  msg.type === 'image' && msg.imageUrl ? 'p-1.5' : 'p-3.5'
+                } ${
+                  isMe
+                    ? 'bg-primary text-white rounded-br-sm'
                     : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                 }`}>
-                  <p className="leading-relaxed">{msg.text}</p>
-                  <p className={`text-[10px] mt-1.5 font-medium ${isMe ? 'text-primary-100 text-right' : 'text-slate-400 text-left'}`}>
+                  {msg.type === 'image' && msg.imageUrl ? (
+                    <button type="button" onClick={() => setLightbox(msg.imageUrl!)} className="block">
+                      <img
+                        src={msg.imageUrl}
+                        alt="Imagem enviada"
+                        className="rounded-xl max-h-64 w-auto object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ) : (
+                    <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                  )}
+                  <p className={`text-[10px] mt-1.5 font-medium ${msg.type === 'image' && msg.imageUrl ? 'px-1.5 pb-0.5' : ''} ${isMe ? 'text-primary-100 text-right' : 'text-slate-400 text-left'}`}>
                     {format(msg.created_at, 'HH:mm')}
                   </p>
                 </div>
@@ -145,8 +187,24 @@ const Chat = () => {
 
       {/* Input Area */}
       <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white flex gap-3 items-end">
-        <button type="button" className="p-3 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-xl transition-colors">
-          <ImageIcon className="w-6 h-6" />
+        <input
+          type="file"
+          accept="image/*"
+          ref={imageInputRef}
+          className="hidden"
+          onChange={(e) => {
+            handleSendImage(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => imageInputRef.current?.click()}
+          disabled={uploadingImage}
+          className="p-3.5 rounded-xl border border-slate-300 text-slate-500 hover:text-primary hover:border-primary transition-colors disabled:opacity-50 flex-shrink-0"
+          aria-label="Enviar imagem"
+        >
+          {uploadingImage ? <Loader2 className="w-6 h-6 animate-spin" /> : <ImagePlus className="w-6 h-6" />}
         </button>
         <textarea
           rows={1}
@@ -173,6 +231,28 @@ const Chat = () => {
           <Send className="w-6 h-6" />
         </button>
       </form>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            aria-label="Fechar"
+          >
+            <X className="w-7 h-7" />
+          </button>
+          <img
+            src={lightbox}
+            alt="Imagem do chat"
+            className="max-h-full max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,77 @@
+// @ts-check
+import js from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import prettier from 'eslint-config-prettier';
+
+export default tseslint.config(
+  {
+    ignores: [
+      'dist/**',
+      'dev-dist/**',
+      'build/**',
+      'coverage/**',
+      'android/**',
+      'ios/**',
+      'node_modules/**',
+      'functions/lib/**',
+      'vite.config.js',
+      'vite.config.d.ts',
+      '**/*.tsbuildinfo',
+    ],
+  },
+
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+
+  {
+    // Application source: browser globals + React rules
+    files: ['src/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.browser },
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+          ignoreRestSiblings: true,
+        },
+      ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
+
+  {
+    // Node-side: config files + Cloud Functions source
+    files: [
+      '*.{js,cjs,mjs,ts}',
+      'vite.config.ts',
+      'capacitor.config.ts',
+      'pwa-assets.config.ts',
+      'scripts/**/*.{js,mjs,ts}',
+      'functions/src/**/*.ts',
+      'functions/scripts/**/*.{js,mjs,ts}',
+    ],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+
+  // Must stay last: turns off any rule that would fight Prettier
+  prettier,
+);

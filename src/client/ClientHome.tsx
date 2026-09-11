@@ -1,10 +1,44 @@
 import { useUserStore } from '@/store/userStore';
-import { Hammer, Zap, Droplets, PenTool, Wrench, Search, PlusCircle, ClipboardList } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
+
+const clientBanners: Banner[] = [
+  {
+    id: 'free',
+    gradient: 'from-primary to-blue-700',
+    icon: PlusCircle,
+    title: 'Publique seu pedido de graça',
+    subtitle: 'Descreva o serviço e receba até 3 profissionais da sua região.',
+    cta: { label: 'Fazer um pedido', to: '/request/new' },
+  },
+  {
+    id: 'verified',
+    gradient: 'from-emerald-400 to-emerald-600',
+    icon: ShieldCheck,
+    title: 'Profissionais verificados',
+    subtitle: 'Documento conferido e selo de confiança. Você escolhe com segurança.',
+    cta: { label: 'Buscar profissionais', to: '/search' },
+  },
+  {
+    id: 'chat',
+    gradient: 'from-fuchsia-500 to-purple-700',
+    icon: MessageSquare,
+    title: 'Converse antes de fechar',
+    subtitle: 'Tire dúvidas pelo chat do app e combine tudo direto com o profissional.',
+  },
+  {
+    id: 'reviews',
+    gradient: 'from-amber-400 to-orange-500',
+    textClass: 'text-orange-950',
+    icon: Star,
+    title: 'Avaliações reais',
+    subtitle: 'Veja a nota de quem já contratou e avalie ao final do serviço.',
+  },
+];
 
 const ClientHome = () => {
   const { user } = useUserStore();
-  const navigate = useNavigate();
 
   const categories = [
     { name: 'Pedreiro', icon: Hammer, color: 'bg-orange-100 text-orange-600', label: 'Pedreiros' },
@@ -14,12 +48,6 @@ const ClientHome = () => {
     { name: 'Marido de aluguel', icon: Wrench, color: 'bg-emerald-100 text-emerald-600', label: 'Marido de Aluguel' },
     { name: 'Reformas', icon: Wrench, color: 'bg-rose-100 text-rose-600', label: 'Reformas' }
   ];
-
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-      navigate(`/?q=${encodeURIComponent(e.currentTarget.value.trim())}`);
-    }
-  };
 
   return (
     <div className="pb-24">
@@ -41,6 +69,8 @@ const ClientHome = () => {
       </div>
 
       <div className="px-4 mt-6 space-y-8">
+        <BannerCarousel banners={clientBanners} />
+
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
           <Link to="/request/new" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">

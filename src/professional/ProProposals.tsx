@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
 import { Proposal, ServiceRequest } from '@/types';
@@ -33,16 +33,18 @@ const ProProposals = () => {
           ...doc.data()
         })) as ProposalWithJob[];
         
-        // Fetch job details for each proposal
-        for (const p of fetchedProposals) {
-          const reqSnap = await getDocs(query(collection(db, 'serviceRequests'), where('__name__', '==', p.requestId)));
-          if (!reqSnap.empty) {
-            const reqData = reqSnap.docs[0].data() as ServiceRequest;
-            p.jobCategory = reqData.subcategory || reqData.category;
-            p.jobPropertyType = reqData.propertyType;
-            p.jobStatus = reqData.status;
-          }
-        }
+        // Carrega os dados do pedido de cada proposta (leitura direta por id, em paralelo)
+        await Promise.all(
+          fetchedProposals.map(async (p) => {
+            const reqSnap = await getDoc(doc(db, 'serviceRequests', p.requestId));
+            if (reqSnap.exists()) {
+              const reqData = reqSnap.data() as ServiceRequest;
+              p.jobCategory = reqData.subcategory || reqData.category;
+              p.jobPropertyType = reqData.propertyType;
+              p.jobStatus = reqData.status;
+            }
+          })
+        );
         
         fetchedProposals.sort((a, b) => b.created_at - a.created_at);
         setProposals(fetchedProposals);

@@ -6,16 +6,41 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
 
+# Dependencies / build output
 node_modules
 dist
 dist-ssr
+dev-dist
+build
+coverage
 *.local
+*.tsbuildinfo
+
+# Stray `tsc -b` artifacts (guarded by tsconfig.node.json noEmit; belt-and-suspenders)
+/vite.config.js
+/vite.config.d.ts
 
 # Env files
 .env
 .env.*
 !.env.example
+
+# Firebase
+.firebase/
+functions/lib/
+functions/node_modules/
+serviceAccountKey.json
+
+# Capacitor / Android local + secrets
+android/.gradle/
+android/local.properties
+android/keystore.properties
+*.keystore
+*.jks
 
 # Editor directories and files
 .vscode/*

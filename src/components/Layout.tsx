@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import Navbar from './Navbar';
+import VerificationBanner from './VerificationBanner';
 import { Link, useLocation } from 'react-router-dom';
 import { Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
@@ -17,6 +18,7 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${isAuthenticated ? 'pb-16 md:pb-0' : ''}`}>
       <Navbar />
+      <VerificationBanner />
       <main className="flex-grow container mx-auto px-4 py-8">
         {children}
       </main>

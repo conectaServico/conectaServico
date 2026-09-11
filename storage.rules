@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+    function isImageUpload() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    // Fotos de perfil: leitura pública (aparecem no app inteiro), escrita só do dono.
+    match /users/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImageUpload();
+      allow delete: if isOwner(userId);
+    }
+
+    // Documentos de identidade (KYC): só o dono envia; só o dono e o admin leem.
+    match /validations/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isImageUpload();
+      allow delete: if isAdmin();
+    }
+
+    // Fotos anexadas a um pedido pelo cliente. Caminho: requestPhotos/<uid>/<reqId>/<arquivo>.
+    // Leitura por qualquer logado (o profissional precisa ver o lead); escrita só do dono.
+    match /requestPhotos/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImageUpload();
+      allow delete: if isOwner(userId);
+    }
+
+    // Imagens enviadas no chat. Caminho: chatImages/<uid>/<arquivo>.
+    // A URL de download já carrega token; leitura restrita a logados.
+    match /chatImages/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImageUpload();
+      allow delete: if isOwner(userId);
+    }
+
+    // Tudo o mais é negado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,14 @@
+dist
+dev-dist
+build
+coverage
+node_modules
+android
+ios
+package-lock.json
+public/models
+.firebase
+functions/lib
+*.min.js
+*.tsbuildinfo
+CHANGELOG.md

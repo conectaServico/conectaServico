@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
 import { Proposal } from '@/types';
@@ -51,37 +51,23 @@ export const useUnreadMessages = () => {
       });
     };
 
-    let mainUnsubscribe: (() => void) | undefined;
-
-    if (user.role === 'client') {
-      const reqQuery = query(collection(db, 'serviceRequests'), where('clientId', '==', user.id));
-      mainUnsubscribe = onSnapshot(reqQuery, async (reqSnap) => {
-        const requestIds = reqSnap.docs.map(d => d.id);
-        if (requestIds.length > 0) {
-          // For clients, we also need to listen to proposals
-          const propUnsubscribe = onSnapshot(collection(db, 'proposals'), (propSnap) => {
-            const clientProposals = propSnap.docs
-              .map(d => d.data() as Proposal)
-              .filter(p => requestIds.includes(p.requestId));
-
-            const chatIds = clientProposals.map(p => `${p.requestId}_${p.professionalId}`);
-            setupMessageListeners(chatIds);
-          });
-          unsubscribes.push(propUnsubscribe);
-        } else {
-           setupMessageListeners([]);
-        }
+    // Um único listener nas propostas do usuário (clientId é desnormalizado na proposta),
+    // simétrico para cliente e profissional — sem varrer a coleção inteira.
+    const isClient = user.role === 'client';
+    const propQuery = query(
+      collection(db, 'proposals'),
+      where(isClient ? 'clientId' : 'professionalId', '==', user.id)
+    );
+    const propUnsub = onSnapshot(propQuery, (propSnap) => {
+      const chatIds = propSnap.docs.map(d => {
+        const p = d.data() as Proposal;
+        return `${p.requestId}_${p.professionalId}`;
       });
-    } else {
-      const propQuery = query(collection(db, 'proposals'), where('professionalId', '==', user.id));
-      mainUnsubscribe = onSnapshot(propQuery, (propSnap) => {
-        const chatIds = propSnap.docs.map(d => `${(d.data() as Proposal).requestId}_${user.id}`);
-        setupMessageListeners(chatIds);
-      });
-    }
+      setupMessageListeners(chatIds);
+    });
 
     return () => {
-      if (mainUnsubscribe) mainUnsubscribe();
+      propUnsub();
       unsubscribes.forEach(unsub => unsub());
     };
   }, [user, location.pathname]);

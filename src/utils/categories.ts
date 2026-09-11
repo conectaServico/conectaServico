@@ -1,11 +1,6 @@
-import { 
+import {
   Wrench,
-  PenTool,
-  Truck,
-  ShieldCheck,
   Smartphone,
-  Star,
-  Sparkles,
   Hammer,
   Droplets
 } from 'lucide-react';
@@ -16,7 +11,7 @@ export const CATEGORY_MENUS = [
     slug: 'assistencia-tecnica',
     icon: Wrench,
     items: ['Aquecedor a gás', 'Ar condicionado'],
-    image: 'https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=A%20handsome%20technician%20in%20a%20dark%20blue%20polo%20shirt%20with%20a%20logo%2C%20wearing%20safety%20glasses%20and%20black%20gloves%2C%20using%20a%20screwdriver%20to%20carefully%20repair%20an%20open%20laptop%20motherboard%20on%20a%20grey%20desk.%20In%20the%20background%2C%20a%20clean%20and%20organized%20technical%20assistance%20workshop%20with%20tools%20hanging%20on%20a%20pegboard.%20Professional%20lighting%2C%20realistic%20photography%2C%20high%20quality&image_size=landscape_16_9'
+    image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=800&q=80'
   },
   { 
     name: 'Design e Tecnologia', 

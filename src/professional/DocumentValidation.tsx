@@ -3,8 +3,10 @@ import { useUserStore } from '@/store/userStore';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { storage, db } from '@/services/firebase';
+import { descriptorFromImage, descriptorsMatch } from '@/utils/faceCheck';
+import { isValidCPF, maskCPF, onlyDigits } from '@/utils/cpf';
 import toast from 'react-hot-toast';
 
 const DocumentValidation = () => {
@@ -16,6 +18,8 @@ const DocumentValidation = () => {
   
   const [docFront, setDocFront] = useState<File | null>(null);
   const [docBack, setDocBack] = useState<File | null>(null);
+  const [cpf, setCpf] = useState('');
+  const [faceChecking, setFaceChecking] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +62,41 @@ const DocumentValidation = () => {
     }
     if (!user) return;
 
+    if (!isValidCPF(cpf)) {
+      toast.error('CPF inválido. Confira os números digitados.');
+      return;
+    }
+
+    if (!user.photo_url) {
+      toast.error('Adicione uma foto de perfil antes de enviar seus documentos.');
+      navigate('/profile');
+      return;
+    }
+
+    // Rosto do documento (frente) deve bater com a foto de perfil.
+    setFaceChecking(true);
+    const docFace = await descriptorFromImage(docFront);
+    setFaceChecking(false);
+    if (!docFace.ok) {
+      toast.error(
+        'Não detectamos um rosto na frente do documento. Envie uma foto nítida do RG ou da CNH.'
+      );
+      return;
+    }
+    let faceMatchDistance: number | null = null;
+    if (Array.isArray(user.faceDescriptor) && user.faceDescriptor.length === 128) {
+      const cmp = descriptorsMatch(user.faceDescriptor, docFace.descriptor);
+      if (cmp) {
+        faceMatchDistance = cmp.distance;
+        if (!cmp.match) {
+          toast.error(
+            'O rosto do documento não confere com a sua foto de perfil. Envie o seu documento e uma selfie sua.'
+          );
+          return;
+        }
+      }
+    }
+
     setSubmitting(true);
     try {
       // Upload images
@@ -75,8 +114,11 @@ const DocumentValidation = () => {
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
+        cpf: onlyDigits(cpf),
         docFrontUrl,
         docBackUrl,
+        faceDescriptor: docFace.descriptor,
+        faceMatchDistance,
         status: 'pending',
         created_at: Date.now()
       });
@@ -162,6 +204,25 @@ const DocumentValidation = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">CPF</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cpf}
+                  onChange={(e) => setCpf(maskCPF(e.target.value))}
+                  placeholder="000.000.000-00"
+                  className={`w-full p-3.5 border rounded-xl bg-slate-50 text-slate-900 outline-none focus:bg-white focus:ring-2 focus:border-transparent transition-all ${
+                    cpf && !isValidCPF(cpf)
+                      ? 'border-danger focus:ring-danger'
+                      : 'border-slate-300 focus:ring-primary'
+                  }`}
+                />
+                {cpf && !isValidCPF(cpf) && (
+                  <p className="text-xs text-danger font-medium mt-1">CPF inválido.</p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Documento de Identidade (RG ou CNH) - Frente</label>
                 <div className="relative border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
                   <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => setDocFront(e.target.files?.[0] || null)} />
@@ -201,10 +262,16 @@ const DocumentValidation = () => {
 
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all flex items-center justify-center shadow-md disabled:opacity-70"
+                disabled={submitting || faceChecking}
+                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
               >
-                {submitting ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Enviar documentos'}
+                {faceChecking ? (
+                  <><Loader2 className="w-6 h-6 animate-spin" /> Verificando rosto…</>
+                ) : submitting ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  'Enviar documentos'
+                )}
               </button>
             </form>
           </>

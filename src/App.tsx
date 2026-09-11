@@ -1,48 +1,71 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/services/firebase';
+import { ensurePushIfGranted } from '@/services/push';
 import { useUserStore } from '@/store/userStore';
 import { User } from '@/types';
 
-// Components
+// Components (sempre presentes -> ficam no bundle de entrada)
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import ScrollToTop from '@/components/ScrollToTop';
+import { Toaster } from 'react-hot-toast';
 
-// Pages
-import Login from '@/pages/Login';
-import Register from '@/pages/Register';
-import Home from '@/pages/Home';
-import Profile from '@/pages/Profile';
-import JobDetails from '@/pages/JobDetails';
-import Chat from '@/pages/Chat';
-import ChatsList from '@/pages/ChatsList';
-import Terms from '@/pages/Terms';
-import Privacy from '@/pages/Privacy';
-import PublicProfile from '@/pages/PublicProfile';
-import Search from '@/pages/Search';
-import HelpCenter from '@/pages/HelpCenter';
-import ContactSupport from '@/pages/ContactSupport';
-import SafetyRules from '@/pages/SafetyRules';
-import AllFaqs from '@/pages/AllFaqs';
+// Pages — carregadas sob demanda (code-splitting por rota)
+const Login = lazy(() => import('@/pages/Login'));
+const Register = lazy(() => import('@/pages/Register'));
+const VerifyAccount = lazy(() => import('@/pages/VerifyAccount'));
+const Notifications = lazy(() => import('@/pages/Notifications'));
+const Home = lazy(() => import('@/pages/Home'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const JobDetails = lazy(() => import('@/pages/JobDetails'));
+const Chat = lazy(() => import('@/pages/Chat'));
+const ChatsList = lazy(() => import('@/pages/ChatsList'));
+const Terms = lazy(() => import('@/pages/Terms'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const PublicProfile = lazy(() => import('@/pages/PublicProfile'));
+const Search = lazy(() => import('@/pages/Search'));
+const HelpCenter = lazy(() => import('@/pages/HelpCenter'));
+const ContactSupport = lazy(() => import('@/pages/ContactSupport'));
+const SafetyRules = lazy(() => import('@/pages/SafetyRules'));
+const AllFaqs = lazy(() => import('@/pages/AllFaqs'));
+const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 
 // Client Pages
-import NewJob from '@/client/NewJob';
-import RequestSuccess from '@/client/RequestSuccess';
-import RequestsList from '@/client/RequestsList';
+const NewJob = lazy(() => import('@/client/NewJob'));
+const RequestSuccess = lazy(() => import('@/client/RequestSuccess'));
+const RequestsList = lazy(() => import('@/client/RequestsList'));
+
 // Professional Pages
-import ProHome from '@/professional/ProHome';
-import ProProposals from '@/professional/ProProposals';
-import Wallet from '@/professional/Wallet';
-import DocumentValidation from '@/professional/DocumentValidation';
-import AdminPanel from '@/admin/AdminPanel';
-import CategoryPage from '@/pages/CategoryPage';
-import { Toaster } from 'react-hot-toast';
+const ProProposals = lazy(() => import('@/professional/ProProposals'));
+const Wallet = lazy(() => import('@/professional/Wallet'));
+const DocumentValidation = lazy(() => import('@/professional/DocumentValidation'));
+const AdminPanel = lazy(() => import('@/admin/AdminPanel'));
+
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
 function App() {
   const setUser = useUserStore((state) => state.setUser);
+  const setVerification = useUserStore((state) => state.setVerification);
+  const currentUser = useUserStore((state) => state.user);
   const [initializing, setInitializing] = useState(isFirebaseConfigured);
+
+  // Profissional já logado e com permissão de notificação concedida: reconfirma o
+  // token de push a cada sessão (o token do FCM pode rotacionar). Sem permissão,
+  // não faz nada aqui — o botão "Ativar avisos" no feed cuida do opt-in.
+  useEffect(() => {
+    if (currentUser?.role === 'professional' && currentUser.id) {
+      ensurePushIfGranted(currentUser.id);
+    }
+  }, [currentUser?.id, currentUser?.role]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -53,18 +76,27 @@ function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        const provider =
+          firebaseUser.providerData[0]?.providerId ||
+          (firebaseUser.phoneNumber && !firebaseUser.email ? 'phone' : null);
+        setVerification({
+          emailVerified: firebaseUser.emailVerified,
+          phoneVerified: !!firebaseUser.phoneNumber,
+          signInProvider: provider,
+        });
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as User);
-        }
+        // Sessão sem doc = cadastro (por telefone) ainda não finalizado — o app
+        // trata como deslogado; os fluxos de Login/Register retomam o wizard.
+        setUser(userDoc.exists() ? (userDoc.data() as User) : null);
       } else {
         setUser(null);
+        setVerification({ emailVerified: false, phoneVerified: false, signInProvider: null });
       }
       setInitializing(false);
     });
 
     return () => unsubscribe();
-  }, [setUser]);
+  }, [setUser, setVerification]);
 
   if (initializing) {
     return (
@@ -76,7 +108,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Toaster 
+      <ScrollToTop />
+      <Toaster
         position="top-center"
         toastOptions={{
           duration: 4000,
@@ -107,133 +140,151 @@ function App() {
             para habilitar login, cadastro, pedidos e chat.
           </div>
         )}
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/categoria/:slug" element={<CategoryPage />} />
-          <Route path="/help" element={<HelpCenter />} />
-          <Route path="/help/safety" element={<SafetyRules />} />
-          <Route path="/help/faqs" element={<AllFaqs />} />
-          
-          {/* Common Protected Routes */}
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } 
-          />
-          <Route
-            path="/user/:id"
-            element={
-              <ProtectedRoute>
-                <PublicProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <ProtectedRoute>
-                <Search />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/requests" 
-            element={
-              <ProtectedRoute allowedRoles={['client']}>
-                <RequestsList />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/requests/:id" 
-            element={
-              <ProtectedRoute>
-                <JobDetails />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/chats" 
-            element={
-              <ProtectedRoute>
-                <ChatsList />
-              </ProtectedRoute>
-            } 
-          >
-            <Route path=":chatId" element={<Chat />} />
-          </Route>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/categoria/:slug" element={<CategoryPage />} />
+            <Route path="/help" element={<HelpCenter />} />
+            <Route path="/help/safety" element={<SafetyRules />} />
+            <Route path="/help/faqs" element={<AllFaqs />} />
 
-          {/* Client Routes */}
-          <Route 
-            path="/request/new" 
-            element={
-              <ProtectedRoute allowedRoles={['client']}>
-                <NewJob />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/request/success" 
-            element={
-              <ProtectedRoute allowedRoles={['client']}>
-                <RequestSuccess />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Common Protected Routes */}
+            <Route
+              path="/verify"
+              element={
+                <ProtectedRoute>
+                  <VerifyAccount />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <Notifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/:id"
+              element={
+                <ProtectedRoute>
+                  <PublicProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/search"
+              element={
+                <ProtectedRoute>
+                  <Search />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests"
+              element={
+                <ProtectedRoute allowedRoles={['client']}>
+                  <RequestsList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests/:id"
+              element={
+                <ProtectedRoute>
+                  <JobDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chats"
+              element={
+                <ProtectedRoute>
+                  <ChatsList />
+                </ProtectedRoute>
+              }
+            >
+              <Route path=":chatId" element={<Chat />} />
+            </Route>
 
-          {/* Professional Routes */}
-          <Route 
-            path="/proposals" 
-            element={
-              <ProtectedRoute allowedRoles={['professional']}>
-                <ProProposals />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/wallet" 
-            element={
-              <ProtectedRoute allowedRoles={['professional']}>
-                <Wallet />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/documents" 
-            element={
-              <ProtectedRoute allowedRoles={['professional']}>
-                <DocumentValidation />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/help/contact" 
-            element={
-              <ProtectedRoute>
-                <ContactSupport />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Client Routes */}
+            <Route
+              path="/request/new"
+              element={
+                <ProtectedRoute allowedRoles={['client']}>
+                  <NewJob />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/request/success"
+              element={
+                <ProtectedRoute allowedRoles={['client']}>
+                  <RequestSuccess />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Admin Routes */}
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute>
-                <AdminPanel />
-              </ProtectedRoute>
-            } 
-          />
+            {/* Professional Routes */}
+            <Route
+              path="/proposals"
+              element={
+                <ProtectedRoute allowedRoles={['professional']}>
+                  <ProProposals />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wallet"
+              element={
+                <ProtectedRoute allowedRoles={['professional']}>
+                  <Wallet />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute allowedRoles={['professional']}>
+                  <DocumentValidation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/help/contact"
+              element={
+                <ProtectedRoute>
+                  <ContactSupport />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </Layout>
     </BrowserRouter>
   );

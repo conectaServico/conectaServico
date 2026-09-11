@@ -1,4 +1,4 @@
-import { HelpCircle, ChevronLeft, Search, MessageCircle, FileText, ExternalLink, Smartphone, CheckCircle, MessageSquare, Star, Coins, Unlock, CheckCircle2 } from 'lucide-react';
+import { HelpCircle, ChevronLeft, Search, MessageCircle, FileText, ExternalLink, Smartphone, MessageSquare, Star, Coins, Unlock, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '@/store/userStore';
 
