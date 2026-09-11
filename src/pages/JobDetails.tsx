@@ -175,7 +175,11 @@ const RequestDetails = () => {
     if (!user || !request || !id) return;
 
     if (!verified) {
-      toast.error('Confirme seu e-mail e telefone para desbloquear contatos.');
+      toast.error(
+        user.role === 'professional'
+          ? 'Confirme seu celular para desbloquear contatos.'
+          : 'Confirme seu e-mail para desbloquear contatos.'
+      );
       navigate('/verify');
       return;
     }
@@ -232,7 +236,11 @@ const RequestDetails = () => {
     if (!message.trim()) return;
 
     if (!verified) {
-      toast.error('Confirme seu e-mail e telefone para enviar propostas.');
+      toast.error(
+        user.role === 'professional'
+          ? 'Confirme seu celular para enviar propostas.'
+          : 'Confirme seu e-mail para enviar propostas.'
+      );
       navigate('/verify');
       return;
     }

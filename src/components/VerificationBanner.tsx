@@ -4,12 +4,13 @@ import { useUserStore } from '@/store/userStore';
 import { useVerified } from '@/hooks/useVerified';
 
 /**
- * Faixa fixa para quem está logado mas ainda não verificou e-mail e/ou telefone.
+ * Faixa fixa para quem está logado mas ainda não confirmou o que a conta dele
+ * exige: cliente = e-mail; profissional (conta só telefone) = celular.
  * As ações sensíveis ficam travadas (regras do Firestore + Functions); isto é o aviso.
  */
 const VerificationBanner = () => {
   const { isAuthenticated } = useUserStore();
-  const { verified, emailVerified, phoneVerified } = useVerified();
+  const { verified, isPhoneAccount } = useVerified();
   const location = useLocation();
 
   if (!isAuthenticated || verified) return null;
@@ -17,7 +18,7 @@ const VerificationBanner = () => {
     return null;
   }
 
-  const missing = [!emailVerified && 'e-mail', !phoneVerified && 'celular'].filter(Boolean).join(' e ');
+  const missing = isPhoneAccount ? 'celular' : 'e-mail';
 
   return (
     <div className="bg-amber-50 border-b border-amber-200">

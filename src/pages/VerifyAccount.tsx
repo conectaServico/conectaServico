@@ -29,11 +29,13 @@ const Row = ({
   icon,
   title,
   done,
+  pendingLabel = 'Pendente',
   children,
 }: {
   icon: React.ReactNode;
   title: string;
   done: boolean;
+  pendingLabel?: string;
   children?: React.ReactNode;
 }) => (
   <div className={`rounded-2xl border p-5 ${done ? 'border-success/30 bg-success/5' : 'border-slate-200 bg-white'}`}>
@@ -44,7 +46,7 @@ const Row = ({
       <div>
         <p className="font-bold text-slate-900">{title}</p>
         <p className={`text-sm ${done ? 'text-success' : 'text-slate-500'}`}>
-          {done ? 'Verificado' : 'Pendente'}
+          {done ? 'Verificado' : pendingLabel}
         </p>
       </div>
     </div>
@@ -104,7 +106,9 @@ const VerifyAccount = () => {
   }, []);
 
   useEffect(() => {
-    if (emailVerified && phoneVerified) {
+    // Cliente só precisa do e-mail — celular é opcional (evita o conflito de
+    // quando a mesma pessoa já usa esse número como login da conta de profissional).
+    if (emailVerified) {
       const dest = sessionStorage.getItem('postVerifyRedirect') || '/home';
       sessionStorage.removeItem('postVerifyRedirect');
       // Marca a conta como verificada no servidor e libera o bônus de indicação (se houver).
@@ -115,7 +119,7 @@ const VerifyAccount = () => {
       toast.success('Conta verificada!');
       navigate(dest);
     }
-  }, [emailVerified, phoneVerified, navigate]);
+  }, [emailVerified, navigate]);
 
   const refreshEmailStatus = async () => {
     if (!auth.currentUser) return;
@@ -207,7 +211,7 @@ const VerifyAccount = () => {
       console.error(e);
       if (code === 'auth/invalid-verification-code') toast.error('Código incorreto.');
       else if (code === 'auth/credential-already-in-use')
-        toast.error('Este telefone já está em uso por outra conta.');
+        toast.error('Este número já é usado em outra conta (ex.: sua conta de profissional). Como o celular é opcional, você pode pular esta etapa.');
       else toast.error('Não foi possível verificar o telefone.');
     } finally {
       setConfirmingCode(false);
@@ -223,7 +227,7 @@ const VerifyAccount = () => {
         <h1 className="text-2xl font-extrabold text-slate-900">Verifique sua conta</h1>
         <p className="text-slate-500 mt-1">
           Para publicar pedidos, enviar propostas, desbloquear contatos ou comprar diamantes,
-          confirme seu e-mail e seu celular.
+          confirme seu e-mail. O celular é opcional.
         </p>
       </div>
 
@@ -251,7 +255,7 @@ const VerifyAccount = () => {
           </div>
         </Row>
 
-        <Row icon={<Phone className="w-5 h-5" />} title="Celular" done={phoneVerified}>
+        <Row icon={<Phone className="w-5 h-5" />} title="Celular (opcional)" done={phoneVerified} pendingLabel="Opcional">
           {!verificationId ? (
             <>
               <input

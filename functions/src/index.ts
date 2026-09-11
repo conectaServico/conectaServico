@@ -71,18 +71,19 @@ function assertAdmin(req: CallableRequest): string {
 }
 
 /**
- * Contato verificado. Cliente: e-mail + telefone confirmados. Profissional: conta
- * criada por telefone (SMS) — o próprio login por SMS já é a verificação.
+ * Contato verificado. Cliente: só e-mail confirmado (celular é opcional — evita
+ * conflito quando a mesma pessoa já usa aquele número como login da conta de
+ * profissional). Profissional: conta criada por telefone (SMS) — o próprio
+ * login já é a verificação.
  */
 function assertVerified(req: CallableRequest): string {
   const uid = assertAuth(req);
   const t = req.auth?.token as Record<string, unknown> | undefined;
   const provider = (t?.firebase as { sign_in_provider?: string } | undefined)?.sign_in_provider;
-  const phoneOk = typeof t?.phone_number === 'string' && !!t.phone_number;
-  if (!phoneOk || (t?.email_verified !== true && provider !== 'phone')) {
+  if (t?.email_verified !== true && provider !== 'phone') {
     throw new HttpsError(
       'failed-precondition',
-      'Confirme seu contato (e-mail e telefone, ou celular) para usar este recurso.'
+      'Confirme seu e-mail (ou entre pelo celular, se for profissional) para usar este recurso.'
     );
   }
   return uid;
@@ -1175,10 +1176,11 @@ export const deleteMyAccount = onCall(async (req) => {
 
 // ---------------------------------------------------------------------------
 // 13. Conta verificada -> premia quem indicou (programa "convide colegas")
-// Chamada pela tela /verify quando e-mail E telefone já estão confirmados.
+// Chamada pela tela /verify quando o e-mail (cliente) ou o celular
+// (profissional, via login) já está confirmado.
 // ---------------------------------------------------------------------------
 export const markVerified = onCall(async (req) => {
-  const uid = assertVerified(req); // exige email_verified + phone_number no token
+  const uid = assertVerified(req);
 
   const userRef = db.doc(`users/${uid}`);
   await db.runTransaction(async (tx) => {

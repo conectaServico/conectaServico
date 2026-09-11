@@ -19,11 +19,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.admin == true;
     }
     // Contato verificado — porta de entrada para ações sensíveis (publicar pedido,
-    // propor, avaliar, conversar). Cliente: e-mail + telefone confirmados. Profissional:
-    // conta só de telefone (o próprio login por SMS já é a verificação).
+    // propor, avaliar, conversar). Cliente: só e-mail confirmado (celular é opcional
+    // — obrigar os dois entraria em conflito quando a mesma pessoa já usa aquele
+    // número como login da conta de profissional). Profissional: conta só de
+    // telefone (o próprio login por SMS já é a verificação).
     function isVerified() {
       return isSignedIn()
-        && request.auth.token.phone_number is string
         && (
           request.auth.token.email_verified == true
           || request.auth.token.firebase.sign_in_provider == 'phone'

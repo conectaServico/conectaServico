@@ -1,23 +1,27 @@
 import { useUserStore } from '@/store/userStore';
 
 /**
- * Estado de verificação da conta (e-mail + telefone), vindo do Firebase Auth.
- * `verified` = pode executar ações sensíveis (publicar pedido, enviar proposta,
- * desbloquear contato, comprar diamantes). A trava real está nas regras do
- * Firestore e nas Cloud Functions; isto é só a camada de UX.
+ * Estado de verificação da conta, vindo do Firebase Auth. `verified` = pode
+ * executar ações sensíveis (publicar pedido, enviar proposta, desbloquear
+ * contato, comprar diamantes). A trava real está nas regras do Firestore e
+ * nas Cloud Functions; isto é só a camada de UX.
+ *
+ * Cliente: só precisa confirmar o e-mail (é a identidade dele). Celular fica
+ * como contato opcional — obrigar os dois criaria conflito quando a mesma
+ * pessoa já usa aquele número como login da conta de profissional.
+ * Profissional: a conta é só telefone (SMS) — o próprio login já é a
+ * verificação de contato.
  */
 export function useVerified() {
   const emailVerified = useUserStore((s) => s.emailVerified);
   const phoneVerified = useUserStore((s) => s.phoneVerified);
   const signInProvider = useUserStore((s) => s.signInProvider);
-  // Conta de profissional é só telefone (SMS) — o próprio login por SMS já é a
-  // verificação de contato, então não passa pelo hub de e-mail.
   const isPhoneAccount = signInProvider === 'phone';
   return {
     emailVerified,
     phoneVerified,
     isPhoneAccount,
-    verified: isPhoneAccount ? phoneVerified : emailVerified && phoneVerified,
+    verified: isPhoneAccount ? phoneVerified : emailVerified,
   };
 }
 

@@ -130,7 +130,7 @@ const Wallet = () => {
   const handleCheckout = async () => {
     if (!user || !selectedPackage) return;
     if (!verified) {
-      toast.error('Confirme seu e-mail e telefone para comprar diamantes.');
+      toast.error('Confirme seu celular para comprar diamantes.');
       navigate('/verify');
       return;
     }

@@ -132,7 +132,7 @@ const NewJob = () => {
   const handleSubmit = async () => {
     if (!user) return;
     if (!verified) {
-      setError('Confirme seu e-mail e telefone para publicar um pedido.');
+      setError('Confirme seu e-mail para publicar um pedido.');
       navigate('/verify');
       return;
     }
