@@ -97,6 +97,9 @@ const NewJob = () => {
   const needsAreaSize = ['Construção e reformas', 'Limpeza e manutenção'].includes(category);
   const needsPropertyType = ['Construção e reformas', 'Limpeza e manutenção', 'Serviços gerais'].includes(category);
   const needsBlueprint = category === 'Construção e reformas';
+  // Só faz sentido perguntar quem fornece material (tinta, cano, cimento...) em
+  // serviços físicos de obra — não em Design e Tecnologia, Assistência técnica etc.
+  const needsMaterials = category === 'Construção e reformas';
 
   const nextStep = () => {
     setError('');
@@ -421,24 +424,26 @@ const NewJob = () => {
               </span>
             </div>
 
-            <div>
-              <label className="block text-base font-bold text-slate-800 mb-2">Sobre os materiais (tintas, canos, cimento, etc)</label>
-              <div className="space-y-3">
-                {(['O profissional fornece', 'Eu fornecerei', 'A combinar'] as const).map(opt => (
-                  <label key={opt} className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${materialOption === opt ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <input 
-                      type="radio" 
-                      name="material" 
-                      value={opt}
-                      checked={materialOption === opt}
-                      onChange={(e) => setMaterialOption(e.target.value as MaterialOption)}
-                      className="w-5 h-5 text-primary border-slate-300 focus:ring-primary"
-                    />
-                    <span className={`ml-3 font-medium ${materialOption === opt ? 'text-primary' : 'text-slate-700'}`}>{opt}</span>
-                  </label>
-                ))}
+            {needsMaterials && (
+              <div>
+                <label className="block text-base font-bold text-slate-800 mb-2">Sobre os materiais (tintas, canos, cimento, etc)</label>
+                <div className="space-y-3">
+                  {(['O profissional fornece', 'Eu fornecerei', 'A combinar'] as const).map(opt => (
+                    <label key={opt} className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${materialOption === opt ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      <input
+                        type="radio"
+                        name="material"
+                        value={opt}
+                        checked={materialOption === opt}
+                        onChange={(e) => setMaterialOption(e.target.value as MaterialOption)}
+                        className="w-5 h-5 text-primary border-slate-300 focus:ring-primary"
+                      />
+                      <span className={`ml-3 font-medium ${materialOption === opt ? 'text-primary' : 'text-slate-700'}`}>{opt}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-base font-bold text-slate-800 mb-2">Para quando você precisa do serviço?</label>
@@ -595,7 +600,7 @@ const NewJob = () => {
                 <p><span className="text-slate-500">Categoria:</span> <strong className="text-slate-800">{category} &gt; {subcategory}</strong></p>
                 <p><span className="text-slate-500">Local:</span> <strong className="text-slate-800">{neighborhood}, {city}</strong></p>
                 <p><span className="text-slate-500">Urgência:</span> <strong className="text-slate-800">{urgency}</strong></p>
-                <p><span className="text-slate-500">Material:</span> <strong className="text-slate-800">{materialOption}</strong></p>
+                {needsMaterials && <p><span className="text-slate-500">Material:</span> <strong className="text-slate-800">{materialOption}</strong></p>}
                 {areaSize && <p><span className="text-slate-500">Tamanho:</span> <strong className="text-slate-800">{areaSize} m²</strong></p>}
                 {preferredDate && <p><span className="text-slate-500">Data Desejada:</span> <strong className="text-slate-800">{new Date(preferredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></p>}
               </div>
