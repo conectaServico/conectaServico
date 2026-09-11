@@ -45,7 +45,7 @@ const ClientHome = () => {
       name: 'Pedreiro',
       icon: Hammer,
       label: 'Pedreiros',
-      image: 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&w=400&q=70',
+      image: 'https://images.unsplash.com/photo-1653280679689-078c04c417a1?auto=format&fit=crop&w=400&q=70',
     },
     {
       name: 'Eletricista',
@@ -63,7 +63,7 @@ const ClientHome = () => {
       name: 'Gesseiro',
       icon: PenTool,
       label: 'Gesseiros',
-      image: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=400&q=70',
+      image: 'https://images.unsplash.com/photo-1761986757577-140af8859587?auto=format&fit=crop&w=400&q=70',
     },
     {
       name: 'Marido de aluguel',

@@ -1035,6 +1035,7 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     const tokens: string[] = [];
     const tokenOwner = new Map<string, string>();
     const inRangePros: string[] = [];
+    const proDistanceKm = new Map<string, number>();
     for (const [uid, pro] of proMap) {
       const proLat = typeof pro.lat === 'number' ? (pro.lat as number) : null;
       const proLng = typeof pro.lng === 'number' ? (pro.lng as number) : null;
@@ -1042,13 +1043,16 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
         typeof pro.radiusKm === 'number' && pro.radiusKm > 0 ? pro.radiusKm : DEFAULT_RADIUS_KM;
 
       let inRange = true;
+      let distanceKm: number | null = null;
       if (reqLat != null && reqLng != null && proLat != null && proLng != null) {
-        inRange = haversineKm({ lat: reqLat, lng: reqLng }, { lat: proLat, lng: proLng }) <= radiusKm + 1;
+        distanceKm = haversineKm({ lat: reqLat, lng: reqLng }, { lat: proLat, lng: proLng });
+        inRange = distanceKm <= radiusKm + 1;
       } else if (reqUf && pro.uf) {
         inRange = String(pro.uf).toUpperCase() === reqUf;
       }
       if (!inRange) continue;
       inRangePros.push(uid);
+      if (distanceKm != null) proDistanceKm.set(uid, distanceKm);
 
       const list: string[] = Array.isArray(pro.fcmTokens) ? pro.fcmTokens : [];
       for (const t of list) {
@@ -1060,12 +1064,22 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     }
 
     const title = 'Novo pedido perto de você';
-    const body = `${subcategory || category || 'Serviço'}${reqCity ? ` · ${reqCity}` : ''}`;
+    const serviceLabel = subcategory || category || 'Serviço';
+    // Com coordenadas dos dois lados dá pra dizer a distância exata pra cada
+    // profissional; no fallback por UF (sem coordenadas) usa a cidade.
+    const bodyFor = (uid: string) => {
+      const km = proDistanceKm.get(uid);
+      if (km != null) {
+        const distanceLabel = km < 1 ? 'menos de 1 km' : `${Math.round(km)} km`;
+        return `${serviceLabel} · a ${distanceLabel} de você`;
+      }
+      return `${serviceLabel}${reqCity ? ` · ${reqCity}` : ''}`;
+    };
 
     // Aviso in-app para todo profissional compatível (independe de ter push ligado).
     await Promise.all(
       inRangePros.map((uid) =>
-        notify(uid, { type: 'new_lead', title, body, link: `/requests/${requestId}` })
+        notify(uid, { type: 'new_lead', title, body: bodyFor(uid), link: `/requests/${requestId}` })
       )
     );
 
@@ -1074,13 +1088,17 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     const dead: Array<{ uid: string; token: string }> = [];
     for (let i = 0; i < tokens.length; i += 500) {
       const batch = tokens.slice(i, i + 500);
-      const resp = await getMessaging().sendEachForMulticast({
-        tokens: batch,
-        notification: { title, body },
-        data: { type: 'new_lead', requestId, category, subcategory },
-        android: { priority: 'high' },
-        webpush: { fcmOptions: { link: `/requests/${requestId}` } },
-      });
+      // sendEach (não sendEachForMulticast) porque cada token tem uma distância
+      // diferente pra mostrar na notificação.
+      const resp = await getMessaging().sendEach(
+        batch.map((token) => ({
+          token,
+          notification: { title, body: bodyFor(tokenOwner.get(token) || '') },
+          data: { type: 'new_lead', requestId, category, subcategory },
+          android: { priority: 'high' as const },
+          webpush: { fcmOptions: { link: `/requests/${requestId}` } },
+        }))
+      );
       resp.responses.forEach((r, idx) => {
         if (r.success) return;
         const code = r.error?.code || '';
