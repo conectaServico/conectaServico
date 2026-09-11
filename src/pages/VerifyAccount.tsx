@@ -5,11 +5,9 @@ import {
   reload,
   RecaptchaVerifier,
   PhoneAuthProvider,
-  linkWithCredential,
-  updatePhoneNumber,
 } from 'firebase/auth';
 import { auth } from '@/services/firebase';
-import { markVerifiedFn } from '@/services/api';
+import { markVerifiedFn, confirmClientPhoneFn, callableErrorMessage } from '@/services/api';
 import { useUserStore } from '@/store/userStore';
 import { toE164BR } from '@/hooks/useVerified';
 import { maskPhone } from '@/utils/masks';
@@ -56,7 +54,7 @@ const Row = ({
 
 const VerifyAccount = () => {
   const navigate = useNavigate();
-  const { user, emailVerified, phoneVerified, signInProvider, setVerification } = useUserStore();
+  const { user, setUser, emailVerified, signInProvider, setVerification } = useUserStore();
 
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [resending, setResending] = useState(false);
@@ -185,34 +183,19 @@ const VerifyAccount = () => {
   };
 
   const confirmCode = async () => {
-    if (!auth.currentUser || !verificationId || code.trim().length < 6) return;
+    if (!verificationId || code.trim().length < 6) return;
     setConfirmingCode(true);
     try {
-      const cred = PhoneAuthProvider.credential(verificationId, code.trim());
-      try {
-        await linkWithCredential(auth.currentUser, cred);
-      } catch (err) {
-        // já existe telefone vinculado nesta conta -> atualiza
-        if ((err as { code?: string })?.code === 'auth/provider-already-linked') {
-          await updatePhoneNumber(auth.currentUser, cred);
-        } else {
-          throw err;
-        }
-      }
-      await auth.currentUser.getIdToken(true);
-      await reload(auth.currentUser);
-      setVerification({
-        emailVerified: !!auth.currentUser.emailVerified,
-        phoneVerified: !!auth.currentUser.phoneNumber,
-      });
-      toast.success('Telefone verificado!');
+      // Confirma o código no servidor sem virar credencial de login desta conta
+      // (por isso não colide quando o número já é o login de uma conta de
+      // profissional — ver confirmClientPhone nas Functions).
+      await confirmClientPhoneFn({ verificationId, code: code.trim() });
+      if (user) setUser({ ...user, phoneConfirmed: true, phoneConfirmedAt: Date.now() });
+      toast.success('Celular confirmado!');
     } catch (e) {
-      const code = (e as { code?: string })?.code;
       console.error(e);
-      if (code === 'auth/invalid-verification-code') toast.error('Código incorreto.');
-      else if (code === 'auth/credential-already-in-use')
-        toast.error('Este número já é usado em outra conta (ex.: sua conta de profissional). Como o celular é opcional, você pode pular esta etapa.');
-      else toast.error('Não foi possível verificar o telefone.');
+      toast.error(callableErrorMessage(e, 'Não foi possível confirmar o código. Tente de novo.'));
+      setCode('');
     } finally {
       setConfirmingCode(false);
     }
@@ -255,7 +238,7 @@ const VerifyAccount = () => {
           </div>
         </Row>
 
-        <Row icon={<Phone className="w-5 h-5" />} title="Celular (opcional)" done={phoneVerified} pendingLabel="Opcional">
+        <Row icon={<Phone className="w-5 h-5" />} title="Celular (opcional)" done={!!user?.phoneConfirmed} pendingLabel="Opcional">
           {!verificationId ? (
             <>
               <input

@@ -41,6 +41,10 @@ export interface User {
   termsVersion?: string;
   faceDescriptor?: number[]; // 128 números do rosto da foto de perfil (match com o documento no KYC)
   contactsVerified?: boolean; // e-mail + telefone confirmados (marcado por Function)
+  // Cliente: celular confirmado por SMS sem virar credencial de login (evita conflito
+  // quando o mesmo número já é o login de uma conta de profissional). Marcado por Function.
+  phoneConfirmed?: boolean;
+  phoneConfirmedAt?: number;
   referredBy?: string; // uid de quem indicou este usuário
   referralRewarded?: boolean; // o bônus de indicação já foi pago ao referenciador?
   referralCount?: number; // quantos indicados verificaram a conta (bônus pago)

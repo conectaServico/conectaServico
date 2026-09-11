@@ -49,6 +49,17 @@ export const markVerifiedFn = httpsCallable<Record<string, never>, { ok: boolean
   'markVerified'
 );
 
+/**
+ * Confirma o celular do CLIENTE por SMS sem virar credencial de login (evita
+ * o conflito de "número já em uso" quando esse número já é o login de uma
+ * conta de profissional). Valida o código no servidor; não chama
+ * linkWithCredential/updatePhoneNumber no cliente.
+ */
+export const confirmClientPhoneFn = httpsCallable<
+  { verificationId: string; code: string },
+  { ok: boolean; phoneNumber: string }
+>(functions, 'confirmClientPhone');
+
 export const resolveSupportTicketFn = httpsCallable<
   { ticketId: string; decision: 'resolved' | 'rejected' | 'in_review'; note?: string; refundDiamonds?: number },
   { ok: boolean }

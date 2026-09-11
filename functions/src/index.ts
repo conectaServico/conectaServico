@@ -1234,6 +1234,69 @@ export const markVerified = onCall(async (req) => {
 });
 
 // ---------------------------------------------------------------------------
+// 14. Confirma o celular do CLIENTE por SMS sem virar credencial de login.
+// Evita o conflito de "número já em uso" quando a mesma pessoa já usa esse
+// número como login da conta de profissional: em vez de linkWithCredential/
+// updatePhoneNumber (que exigem o número livre no projeto inteiro), valida o
+// código direto na Identity Toolkit REST API — a mesma verificação que o SDK
+// faria — e só grava um selo em Firestore. O número nunca fica "reservado"
+// para esta conta, então pode coexistir com o login por telefone do
+// profissional.
+// ---------------------------------------------------------------------------
+// Chave pública do Firebase Web (a mesma do firebaseConfig do front-end — não
+// é segredo: já vem embutida em todo app Firebase, identifica o projeto e não
+// autentica nada sozinha; a segurança está nas regras/Functions).
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyAMeLbuHPJS6CCtr0kPdEJRqEC4gVN2wMU';
+
+export const confirmClientPhone = onCall(async (req) => {
+  const uid = assertAuth(req);
+  const sessionInfo = String(req.data?.verificationId || '').trim();
+  const code = String(req.data?.code || '').trim();
+  if (!sessionInfo || !code) throw new HttpsError('invalid-argument', 'Dados incompletos.');
+
+  const userRef = db.doc(`users/${uid}`);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) throw new HttpsError('not-found', 'Perfil não encontrado.');
+  if (userSnap.data()?.role !== 'client') {
+    throw new HttpsError('permission-denied', 'Esse recurso é só para contas de cliente.');
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=${FIREBASE_WEB_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionInfo, code }),
+      }
+    );
+  } catch (e) {
+    console.error('confirmClientPhone: falha de rede na Identity Toolkit', e);
+    throw new HttpsError('unavailable', 'Não foi possível confirmar agora. Tente de novo.');
+  }
+
+  const data = (await resp.json().catch(() => ({}))) as {
+    phoneNumber?: string;
+    error?: { message?: string };
+  };
+
+  if (!resp.ok) {
+    const msg = data?.error?.message || '';
+    if (msg.includes('INVALID_CODE')) throw new HttpsError('invalid-argument', 'Código incorreto.');
+    if (msg.includes('INVALID_SESSION_INFO') || msg.includes('SESSION_EXPIRED')) {
+      throw new HttpsError('deadline-exceeded', 'Código expirado. Peça um novo.');
+    }
+    console.error('confirmClientPhone: Identity Toolkit recusou', msg);
+    throw new HttpsError('internal', 'Não foi possível confirmar o código. Tente de novo.');
+  }
+
+  await userRef.update({ phoneConfirmed: true, phoneConfirmedAt: Date.now() });
+
+  return { ok: true, phoneNumber: data.phoneNumber || '' };
+});
+
+// ---------------------------------------------------------------------------
 // 14. Suporte / disputa — admin resolve, opcionalmente reembolsa diamantes
 // ---------------------------------------------------------------------------
 export const resolveSupportTicket = onCall(async (req) => {

@@ -65,6 +65,7 @@ service cloud.firestore {
         && incoming().get('rating', 0) == 0
         && incoming().get('reviewCount', 0) == 0
         && incoming().get('isAdmin', false) == false
+        && incoming().get('phoneConfirmed', false) == false
         && incoming().role in ['client', 'professional']
         && incoming().termsAcceptedAt is number;
 
@@ -75,7 +76,8 @@ service cloud.firestore {
           'coinsBalance', 'rating', 'ratingSum', 'reviewCount',
           'clientRating', 'clientRatingSum', 'clientReviewCount',
           'verified', 'isAdmin', 'id', 'role', 'created_at',
-          'referredBy', 'referralRewarded', 'referralCount', 'contactsVerified'
+          'referredBy', 'referralRewarded', 'referralCount', 'contactsVerified',
+          'phoneConfirmed', 'phoneConfirmedAt'
         ])
       );
 
