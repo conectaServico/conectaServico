@@ -1,27 +1,28 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
 import { Loader2, Camera, ShieldCheck, AlertCircle, CheckCircle2, User as UserIcon, Trash2, Upload, Briefcase, FileText, HelpCircle, FileSignature, LogOut, ChevronRight, ChevronLeft, ListOrdered } from 'lucide-react';
 import { maskPhone, maskCEP } from '@/utils/masks';
 import { buildGeoFields } from '@/utils/geo';
-import { analyzeFacePhoto, preloadFaceApi, descriptorsMatch } from '@/utils/faceCheck';
+import { validateFacePhoto, preloadFaceApi } from '@/utils/faceCheck';
 import { deleteMyAccountFn, callableErrorMessage } from '@/services/api';
 import { Review } from '@/types';
 import toast from 'react-hot-toast';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const Profile = () => {
   const { user, setUser } = useUserStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState<'menu' | 'edit'>('menu');
+  const radiusSectionRef = useRef<HTMLDivElement>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState(user?.photo_url || '');
-  const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
   const [phone, setPhone] = useState(user?.phone || '');
   const [email, setEmail] = useState(user?.email || '');
   const [cep, setCep] = useState(user?.cep || '');
@@ -53,25 +54,29 @@ const Profile = () => {
     window.scrollTo(0, 0);
   }, [view]);
 
+  // Deep-link "/profile?edit=radius" (ex.: "Ajustar raio" na home do profissional):
+  // abre direto na edição e rola até o campo de raio, em vez de soltar o usuário
+  // no menu do perfil sem indicação de onde clicar.
+  useEffect(() => {
+    if (searchParams.get('edit') === 'radius' && user?.role === 'professional') {
+      setView('edit');
+    }
+  }, [searchParams, user?.role]);
+
+  useEffect(() => {
+    if (view !== 'edit' || searchParams.get('edit') !== 'radius') return;
+    const t = setTimeout(() => {
+      radiusSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [view, searchParams]);
+
   useEffect(() => {
     // Pré-aquece o face-api.js só para profissionais (quem passa pela validação de
     // rosto na troca de foto). Clientes nunca baixam esse chunk.
     if (user?.role !== 'professional') return;
     preloadFaceApi().catch((err) => console.error('Erro ao carregar face-api:', err));
   }, [user?.role]);
-
-  // Descritor do rosto do documento já enviado (se houver) — para checar que a nova
-  // foto de perfil é da mesma pessoa do documento.
-  const [docFaceDescriptor, setDocFaceDescriptor] = useState<number[] | null>(null);
-  useEffect(() => {
-    if (!user?.id || user.role !== 'professional') return;
-    getDoc(doc(db, 'validations', user.id))
-      .then((snap) => {
-        const d = snap.exists() ? snap.data()?.faceDescriptor : null;
-        if (Array.isArray(d) && d.length === 128) setDocFaceDescriptor(d as number[]);
-      })
-      .catch(() => undefined);
-  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!user?.id || user.role !== 'professional') return;
@@ -120,28 +125,15 @@ const Profile = () => {
     e.target.value = '';
     if (!file) return;
 
-    // Profissional: a foto precisa ser uma selfie válida E, se já enviou documento,
-    // ser da MESMA pessoa do documento. Falha fechada.
+    // Profissional: a foto de perfil precisa ser uma selfie válida (rosto detectável).
     if (user?.role === 'professional') {
       setFaceLoading(true);
-      const res = await analyzeFacePhoto(file);
+      const res = await validateFacePhoto(file);
+      setFaceLoading(false);
       if (!res.ok) {
-        setFaceLoading(false);
         toast.error(res.reason);
         return;
       }
-
-      if (docFaceDescriptor) {
-        const cmp = descriptorsMatch(res.descriptor, docFaceDescriptor);
-        if (cmp && !cmp.match) {
-          setFaceLoading(false);
-          toast.error('Esta foto não confere com o rosto do documento que você enviou.');
-          return;
-        }
-      }
-
-      setFaceLoading(false);
-      setFaceDescriptor(res.descriptor);
       toast.success('Rosto validado.');
     }
 
@@ -232,10 +224,6 @@ const Profile = () => {
         if (user.services) {
           updates.services = user.services;
         }
-        // Descritor da nova foto (para o match com o documento no KYC)
-        if (photo && faceDescriptor) {
-          updates.faceDescriptor = faceDescriptor;
-        }
       }
 
       await updateDoc(doc(db, 'users', user.id), updates);
@@ -324,7 +312,7 @@ const Profile = () => {
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900">Validação de documentos</h3>
+                      <h3 className="font-bold text-slate-900">Validação de CPF</h3>
                       <p className="text-sm text-slate-500">Torne-se um profissional verificado</p>
                     </div>
                   </div>
@@ -732,7 +720,7 @@ const Profile = () => {
                       <Briefcase className="w-5 h-5 text-primary" />
                       Seu Negócio
                     </h2>
-                    <div>
+                    <div ref={radiusSectionRef}>
                       <div className="flex justify-between items-center mb-4">
                         <label className="block text-sm font-bold text-slate-700">
                           Raio de Atuação (KM)

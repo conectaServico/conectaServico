@@ -78,17 +78,17 @@ export function useProOnboarding() {
       label: 'Sua região e raio de atuação',
       hint: 'Informe seu CEP para ver só os pedidos perto de você.',
       done: hasRegion,
-      to: '/profile',
+      to: '/profile?edit=radius',
     },
     {
       key: 'document',
-      label: 'Documento de identidade',
+      label: 'CPF',
       hint:
         validationStatus === 'rejected'
-          ? 'Seus documentos foram recusados. Envie novamente.'
+          ? 'Seu CPF foi recusado. Envie novamente.'
           : validationStatus === 'pending'
             ? 'Recebido — em análise pela nossa equipe.'
-            : 'Envie RG ou CNH para liberar seu acesso e ganhar o selo verificado.',
+            : 'Informe seu CPF para liberar seu acesso e ganhar o selo verificado.',
       done: docDone,
       pending: validationStatus === 'pending',
       to: '/documents',

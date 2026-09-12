@@ -12,8 +12,8 @@ interface ValidationRequest {
   userName: string;
   userEmail: string;
   cpf?: string;
-  docFrontUrl: string;
-  docBackUrl: string;
+  docFrontUrl?: string;
+  docBackUrl?: string;
   faceMatchDistance?: number | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: number;
@@ -121,7 +121,7 @@ const AdminPanel = () => {
           onClick={() => setTab('kyc')}
           className={`px-4 py-2 rounded-xl font-bold text-sm transition-colors ${tab === 'kyc' ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
         >
-          Documentos ({requests.filter((r) => r.status === 'pending').length})
+CPF ({requests.filter((r) => r.status === 'pending').length})
         </button>
         <button
           onClick={() => setTab('support')}
@@ -154,16 +154,22 @@ const AdminPanel = () => {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap gap-4">
-                      <a href={req.docFrontUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                        <FileImage className="w-6 h-6 text-slate-400" />
-                        <span className="text-xs font-bold text-slate-600">Doc Frente</span>
-                      </a>
-                      <a href={req.docBackUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                        <FileImage className="w-6 h-6 text-slate-400" />
-                        <span className="text-xs font-bold text-slate-600">Doc Verso</span>
-                      </a>
-                    </div>
+                    {(req.docFrontUrl || req.docBackUrl) && (
+                      <div className="flex flex-wrap gap-4">
+                        {req.docFrontUrl && (
+                          <a href={req.docFrontUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                            <FileImage className="w-6 h-6 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600">Doc Frente</span>
+                          </a>
+                        )}
+                        {req.docBackUrl && (
+                          <a href={req.docBackUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                            <FileImage className="w-6 h-6 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600">Doc Verso</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
 
                     {req.status === 'pending' && (
                       <div className="flex items-center gap-3">

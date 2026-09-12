@@ -39,7 +39,6 @@ export interface User {
   fcmUpdatedAt?: number;
   termsAcceptedAt?: number; // aceite dos Termos/Política (LGPD) — obrigatório no cadastro
   termsVersion?: string;
-  faceDescriptor?: number[]; // 128 números do rosto da foto de perfil (match com o documento no KYC)
   contactsVerified?: boolean; // e-mail + telefone confirmados (marcado por Function)
   // Cliente: celular confirmado por SMS sem virar credencial de login (evita conflito
   // quando o mesmo número já é o login de uma conta de profissional). Marcado por Function.
@@ -51,7 +50,7 @@ export interface User {
   created_at: number;
 }
 
-export const TERMS_VERSION = '2026-09-10';
+export const TERMS_VERSION = '2026-09-12';
 
 /**
  * Projeção pública de `User` (coleção `publicProfiles`, mantida pela Function syncPublicProfile).

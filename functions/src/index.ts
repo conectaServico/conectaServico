@@ -10,7 +10,13 @@ import { getMessaging } from 'firebase-admin/messaging';
 admin.initializeApp();
 const db = admin.firestore();
 
-setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10 });
+// invoker: 'public' — sem isso, o Cloud Run por baixo do Functions v2 pode acabar
+// exigindo autenticação na camada de infraestrutura pra invocar a function (antes
+// mesmo dela rodar), o que quebra o preflight CORS do navegador com "No
+// 'Access-Control-Allow-Origin' header" — a auth de verdade já é feita dentro de
+// cada handler via Firebase Auth (assertAuth/assertVerified), então liberar a
+// invocação pública aqui é seguro.
+setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10, invoker: 'public' });
 
 const UNLOCK_COST = 10;
 const SIGNUP_BONUS = 100;
@@ -68,6 +74,30 @@ function assertAdmin(req: CallableRequest): string {
     throw new HttpsError('permission-denied', 'Acesso restrito a administradores.');
   }
   return uid;
+}
+
+/**
+ * Envolve o handler de toda callable: se estourar um erro que não seja um
+ * HttpsError explícito (ex.: índice do Firestore faltando, bug não previsto),
+ * o SDK do cliente só recebe o código genérico "internal" sem detalhe algum —
+ * o que torna esse tipo de bug quase impossível de diagnosticar a distância.
+ * Aqui a mensagem real vai logada (console.error, pro Cloud Logging) e também
+ * embutida na HttpsError devolvida ao cliente, então qualquer "internal" que
+ * aparecer no app já vem com a causa.
+ */
+function wrapCallable<Res>(
+  handler: (req: CallableRequest) => Res | Promise<Res>
+): (req: CallableRequest) => Promise<Res> {
+  return async (req) => {
+    try {
+      return await handler(req);
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error('Erro não tratado numa callable:', err);
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new HttpsError('internal', `Erro inesperado: ${detail}`);
+    }
+  };
 }
 
 /**
@@ -194,7 +224,7 @@ export const onUserCreated = onDocumentCreated('users/{userId}', async (event) =
 // ---------------------------------------------------------------------------
 // 2. Desbloquear contato do cliente (débito de diamantes atômico)
 // ---------------------------------------------------------------------------
-export const unlockContact = onCall(async (req) => {
+export const unlockContact = onCall(wrapCallable(async (req) => {
   const uid = assertVerified(req);
   const requestId = String(req.data?.requestId || '').trim();
   if (!requestId) throw new HttpsError('invalid-argument', 'requestId é obrigatório.');
@@ -281,13 +311,13 @@ export const unlockContact = onCall(async (req) => {
       ...contact(),
     };
   });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 3. Aceitar proposta (fecha o pedido e rejeita as demais)
 // Sem reembolso: quem gastou diamante no lead e não foi escolhido não recebe de volta.
 // ---------------------------------------------------------------------------
-export const acceptProposal = onCall(async (req) => {
+export const acceptProposal = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
   const requestId = String(req.data?.requestId || '').trim();
   const proposalId = String(req.data?.proposalId || '').trim();
@@ -333,13 +363,13 @@ export const acceptProposal = onCall(async (req) => {
   });
 
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 3b. Cancelar / reabrir pedido (cliente)
 // Sem reembolso: quem já desbloqueou o pedido não recebe os diamantes de volta.
 // ---------------------------------------------------------------------------
-export const cancelRequest = onCall(async (req) => {
+export const cancelRequest = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
   const requestId = String(req.data?.requestId || '').trim();
   if (!requestId) throw new HttpsError('invalid-argument', 'requestId é obrigatório.');
@@ -371,9 +401,9 @@ export const cancelRequest = onCall(async (req) => {
   });
 
   return { ok: true };
-});
+}));
 
-export const reopenRequest = onCall(async (req) => {
+export const reopenRequest = onCall(wrapCallable(async (req) => {
   const uid = assertVerified(req);
   const requestId = String(req.data?.requestId || '').trim();
   if (!requestId) throw new HttpsError('invalid-argument', 'requestId é obrigatório.');
@@ -396,13 +426,13 @@ export const reopenRequest = onCall(async (req) => {
   });
 
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 3c. Excluir pedido (cliente) — some de vez, junto com propostas/unlocks/mensagens.
 // Permitido só em OPEN ou CANCELED. Sem reembolso.
 // ---------------------------------------------------------------------------
-export const deleteRequest = onCall(async (req) => {
+export const deleteRequest = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
   const requestId = String(req.data?.requestId || '').trim();
   if (!requestId) throw new HttpsError('invalid-argument', 'requestId é obrigatório.');
@@ -434,7 +464,7 @@ export const deleteRequest = onCall(async (req) => {
   await writer.close();
 
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 3d. Acompanhamento do serviço (cliente): iniciar / concluir.
@@ -468,13 +498,13 @@ async function advanceRequestStatus(
   return { ok: true };
 }
 
-export const startWork = onCall((req) => advanceRequestStatus(req, 'NEGOTIATING', 'IN_PROGRESS', 'started_at'));
-export const completeWork = onCall((req) => advanceRequestStatus(req, 'IN_PROGRESS', 'COMPLETED', 'completed_at'));
+export const startWork = onCall(wrapCallable((req) => advanceRequestStatus(req, 'NEGOTIATING', 'IN_PROGRESS', 'started_at')));
+export const completeWork = onCall(wrapCallable((req) => advanceRequestStatus(req, 'IN_PROGRESS', 'COMPLETED', 'completed_at')));
 
 // ---------------------------------------------------------------------------
 // 4. Orçamento direto pelo perfil do profissional
 // ---------------------------------------------------------------------------
-export const attachProfessionalToRequest = onCall(async (req) => {
+export const attachProfessionalToRequest = onCall(wrapCallable(async (req) => {
   const uid = assertVerified(req);
   const requestId = String(req.data?.requestId || '').trim();
   const professionalId = String(req.data?.professionalId || '').trim();
@@ -545,7 +575,7 @@ export const attachProfessionalToRequest = onCall(async (req) => {
 
   await batch.commit();
   return { ok: true, chatId };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 5. Agregado de avaliação do profissional
@@ -661,7 +691,7 @@ export const onClientReviewCreated = onDocumentCreated('clientReviews/{reviewId}
 // ---------------------------------------------------------------------------
 // 6. Revisão de KYC (admin)
 // ---------------------------------------------------------------------------
-export const reviewValidation = onCall(async (req) => {
+export const reviewValidation = onCall(wrapCallable(async (req) => {
   const adminUid = assertAdmin(req);
   const userId = String(req.data?.userId || '').trim();
   const decision = String(req.data?.decision || '');
@@ -689,12 +719,12 @@ export const reviewValidation = onCall(async (req) => {
     link: '/documents',
   });
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 7 / 8. Concessão de admin
 // ---------------------------------------------------------------------------
-export const bootstrapAdmin = onCall({ secrets: [ADMIN_BOOTSTRAP_SECRET] }, async (req) => {
+export const bootstrapAdmin = onCall({ secrets: [ADMIN_BOOTSTRAP_SECRET] }, wrapCallable(async (req) => {
   const uid = assertAuth(req);
   const provided = String(req.data?.secret || '');
   const expected = ADMIN_BOOTSTRAP_SECRET.value();
@@ -704,9 +734,9 @@ export const bootstrapAdmin = onCall({ secrets: [ADMIN_BOOTSTRAP_SECRET] }, asyn
   await admin.auth().setCustomUserClaims(uid, { admin: true });
   await db.doc(`users/${uid}`).set({ isAdmin: true }, { merge: true });
   return { ok: true, note: 'Faça logout e login novamente para o token atualizar.' };
-});
+}));
 
-export const grantAdmin = onCall(async (req) => {
+export const grantAdmin = onCall(wrapCallable(async (req) => {
   assertAdmin(req);
   const email = String(req.data?.email || '').trim().toLowerCase();
   if (!email) throw new HttpsError('invalid-argument', 'Informe o e-mail.');
@@ -715,12 +745,12 @@ export const grantAdmin = onCall(async (req) => {
   await admin.auth().setCustomUserClaims(target.uid, { admin: true });
   await db.doc(`users/${target.uid}`).set({ isAdmin: true }, { merge: true });
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 9. Compra simulada de diamantes (ponte até a Fase 2 / gateway real)
 // ---------------------------------------------------------------------------
-export const simulatePurchase = onCall(async (req) => {
+export const simulatePurchase = onCall(wrapCallable(async (req) => {
   const uid = assertVerified(req);
   if (process.env.ALLOW_SIMULATED_PAYMENTS !== 'true') {
     throw new HttpsError(
@@ -748,13 +778,13 @@ export const simulatePurchase = onCall(async (req) => {
     });
   });
   return { ok: true, diamonds: pkg.diamonds };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 10. Pagamento real — Mercado Pago (Checkout Pro + webhook)
 // O saldo só é creditado quando o webhook confirma o pagamento como "approved".
 // ---------------------------------------------------------------------------
-export const createPaymentPreference = onCall({ secrets: [MP_ACCESS_TOKEN] }, async (req) => {
+export const createPaymentPreference = onCall({ secrets: [MP_ACCESS_TOKEN] }, wrapCallable(async (req) => {
   const uid = assertVerified(req);
   const token = MP_ACCESS_TOKEN.value();
   if (!token) {
@@ -826,7 +856,7 @@ export const createPaymentPreference = onCall({ secrets: [MP_ACCESS_TOKEN] }, as
     paymentId: payRef.id,
     initPoint: pref.init_point || pref.sandbox_init_point || '',
   };
-});
+}));
 
 export const mercadoPagoWebhook = onRequest(
   { secrets: [MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET], invoker: 'public' },
@@ -1137,7 +1167,7 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
 // Mantém registros financeiros (transactions/payments — só têm o uid) e avaliações
 // (anonimizadas), por obrigação contábil/legal. Depois remove a conta do Auth.
 // ---------------------------------------------------------------------------
-export const deleteMyAccount = onCall(async (req) => {
+export const deleteMyAccount = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
 
   // 1. Arquivos no Storage
@@ -1190,14 +1220,14 @@ export const deleteMyAccount = onCall(async (req) => {
   });
 
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 13. Conta verificada -> premia quem indicou (programa "convide colegas")
 // Chamada pela tela /verify quando o e-mail (cliente) ou o celular
 // (profissional, via login) já está confirmado.
 // ---------------------------------------------------------------------------
-export const markVerified = onCall(async (req) => {
+export const markVerified = onCall(wrapCallable(async (req) => {
   const uid = assertVerified(req);
 
   const userRef = db.doc(`users/${uid}`);
@@ -1249,7 +1279,7 @@ export const markVerified = onCall(async (req) => {
   }
 
   return { ok: true };
-});
+}));
 
 // ---------------------------------------------------------------------------
 // 14. Confirma o celular do CLIENTE por SMS sem virar credencial de login.
@@ -1266,7 +1296,7 @@ export const markVerified = onCall(async (req) => {
 // autentica nada sozinha; a segurança está nas regras/Functions).
 const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyAMeLbuHPJS6CCtr0kPdEJRqEC4gVN2wMU';
 
-export const confirmClientPhone = onCall(async (req) => {
+export const confirmClientPhone = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
   const sessionInfo = String(req.data?.verificationId || '').trim();
   const code = String(req.data?.code || '').trim();
@@ -1312,12 +1342,130 @@ export const confirmClientPhone = onCall(async (req) => {
   await userRef.update({ phoneConfirmed: true, phoneConfirmedAt: Date.now() });
 
   return { ok: true, phoneNumber: data.phoneNumber || '' };
-});
+}));
 
 // ---------------------------------------------------------------------------
-// 14. Suporte / disputa — admin resolve, opcionalmente reembolsa diamantes
+// 15. Libera um número de celular para cadastro de PROFISSIONAL quando ele
+// está "ocupado" no Firebase Auth por uma conta sem perfil de profissional.
+// Cliente e profissional são identidades diferentes e podem compartilhar o
+// mesmo número; só duas contas de PROFISSIONAL é que não podem (é o próprio
+// login). Isso cobre tanto o número "órfão" que o signInWithPhoneNumber da
+// Identity Toolkit cria por baixo dos panos no confirmClientPhone acima
+// (nunca teve perfil) quanto uma conta de cliente antiga (de antes desse
+// confirmClientPhone existir) que chegou a vincular o número de fato via
+// linkWithCredential. Chamada pelo cadastro de profissional ANTES de enviar o
+// SMS — nunca pelo login, que deve continuar entrando na própria conta.
 // ---------------------------------------------------------------------------
-export const resolveSupportTicket = onCall(async (req) => {
+export const prepareProfessionalPhone = onCall(wrapCallable(async (req) => {
+  const e164 = String(req.data?.phone || '').trim();
+  if (!/^\+[1-9]\d{7,14}$/.test(e164)) {
+    throw new HttpsError('invalid-argument', 'Número inválido.');
+  }
+
+  let existing: admin.auth.UserRecord;
+  try {
+    existing = await admin.auth().getUserByPhoneNumber(e164);
+  } catch (e) {
+    if ((e as { code?: string })?.code === 'auth/user-not-found') return { ok: true };
+    console.error('prepareProfessionalPhone: falha ao consultar o número', e);
+    throw new HttpsError('unavailable', 'Não foi possível validar o número agora. Tente de novo.');
+  }
+
+  const userSnap = await db.doc(`users/${existing.uid}`).get();
+  const role = userSnap.exists ? (userSnap.data() as Record<string, unknown>).role : undefined;
+
+  if (role === 'professional') {
+    throw new HttpsError(
+      'already-exists',
+      'Já existe uma conta de profissional com esse número. Faça login em vez de cadastrar.'
+    );
+  }
+
+  // Sem perfil (número órfão) ou perfil de CLIENTE: libera o número para que o
+  // cadastro de profissional gere (ou reaproveite) uma conta própria, sem
+  // colidir com dados de outra pessoa.
+  await admin.auth().updateUser(existing.uid, { phoneNumber: null });
+  return { ok: true };
+}));
+
+// ---------------------------------------------------------------------------
+// 16. Envia o CPF para validação (KYC) — auto-aprova na hora: o único critério
+// é o CPF ter dígito verificador correto e não estar em uso por OUTRA conta de
+// profissional (sem revisão humana). As regras do Firestore não fazem checagem
+// atômica entre documentos diferentes, então essa unicidade só dá pra garantir
+// aqui: cpfIndex/{cpf} -> uid é lido e escrito na mesma transação que grava
+// validations/{uid} e users/{uid}.verified, e a escrita direta do cliente
+// nessas coleções está bloqueada nas regras (só Function/admin escrevem).
+// ---------------------------------------------------------------------------
+function isValidCPF(input: string): boolean {
+  const cpf = input.replace(/\D/g, '');
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false; // todos os dígitos iguais
+
+  const calcDigit = (len: number): number => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(cpf[i]) * (len + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  return calcDigit(9) === Number(cpf[9]) && calcDigit(10) === Number(cpf[10]);
+}
+
+export const submitCpfValidation = onCall(wrapCallable(async (req) => {
+  const uid = assertAuth(req);
+  const cpf = String(req.data?.cpf || '').replace(/\D/g, '');
+  if (!isValidCPF(cpf)) throw new HttpsError('invalid-argument', 'CPF inválido.');
+
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists || userSnap.data()?.role !== 'professional') {
+    throw new HttpsError('permission-denied', 'Esse recurso é só para contas de profissional.');
+  }
+  const user = userSnap.data() as Record<string, unknown>;
+
+  const validationRef = db.doc(`validations/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const indexRef = db.doc(`cpfIndex/${cpf}`);
+    const [indexSnap, prevValidationSnap] = await Promise.all([tx.get(indexRef), tx.get(validationRef)]);
+    if (indexSnap.exists && indexSnap.data()?.uid !== uid) {
+      throw new HttpsError('already-exists', 'Esse CPF já está cadastrado em outra conta.');
+    }
+
+    // Corrigiu um CPF digitado errado antes: libera o índice antigo.
+    const prevCpf = prevValidationSnap.exists ? (prevValidationSnap.data()?.cpf as string) : undefined;
+    if (prevCpf && prevCpf !== cpf) {
+      tx.delete(db.doc(`cpfIndex/${prevCpf}`));
+    }
+
+    const now = Date.now();
+    tx.set(indexRef, { uid, updated_at: now });
+    tx.set(validationRef, {
+      userId: uid,
+      userName: (user.name as string) || '',
+      userEmail: (user.email as string) || '',
+      cpf,
+      status: 'approved',
+      reviewed_at: now,
+      reviewed_by: 'auto',
+      created_at: now,
+    });
+    tx.update(userSnap.ref, { verified: true });
+  });
+
+  await notify(uid, {
+    type: 'kyc',
+    title: 'Conta verificada ✅',
+    body: 'Seu selo de profissional verificado já está ativo.',
+    link: '/documents',
+  }).catch(() => undefined);
+
+  return { ok: true };
+}));
+
+// ---------------------------------------------------------------------------
+// 17. Suporte / disputa — admin resolve, opcionalmente reembolsa diamantes
+// ---------------------------------------------------------------------------
+export const resolveSupportTicket = onCall(wrapCallable(async (req) => {
   const adminUid = assertAdmin(req);
   const ticketId = String(req.data?.ticketId || '').trim();
   const decision = String(req.data?.decision || '');
@@ -1369,4 +1517,4 @@ export const resolveSupportTicket = onCall(async (req) => {
   }
 
   return { ok: true };
-});
+}));

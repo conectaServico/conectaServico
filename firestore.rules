@@ -246,21 +246,17 @@ service cloud.firestore {
     }
 
     // ---------- validations (KYC) ----------
+    // Escrita só via Function submitCpfValidation (impede CPF duplicado entre contas
+    // — precisa de uma checagem atômica contra cpfIndex/* que as regras não fazem).
     match /validations/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-
-      allow create: if isOwner(userId)
-        && incoming().userId == userId
-        && incoming().status == 'pending';
-
-      // Reenvio pelo dono após recusa, ou ação do admin.
-      allow update: if isAdmin() || (
-        isOwner(userId)
-        && incoming().status == 'pending'
-        && resource.data.status == 'rejected'
-      );
-
+      allow create, update: if isAdmin();
       allow delete: if false;
+    }
+
+    // Índice CPF -> uid (só a Function lê/escreve, via Admin SDK).
+    match /cpfIndex/{cpf} {
+      allow read, write: if false;
     }
 
     // ---------- publicProfiles (projeção segura, mantida pela Function syncPublicProfile) ----------

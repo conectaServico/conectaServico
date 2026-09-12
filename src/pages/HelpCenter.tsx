@@ -80,7 +80,7 @@ const HelpCenter = () => {
     },
     {
       q: 'Como valido meus documentos?',
-      a: 'Acesse o seu Perfil, clique em "Validação de documentos" e siga as instruções para enviar uma foto do seu RG/CNH e uma selfie. A validação aumenta muito suas chances de fechar serviços.'
+      a: 'Acesse o seu Perfil, clique em "Validação de CPF" e informe seu CPF. A validação aumenta muito suas chances de fechar serviços.'
     }
   ];
 

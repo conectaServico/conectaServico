@@ -1,25 +1,21 @@
-import { ShieldCheck, Upload, AlertCircle, CheckCircle2, ChevronLeft, Loader2 } from 'lucide-react';
+import { ShieldCheck, AlertCircle, CheckCircle2, ChevronLeft, Loader2 } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { storage, db } from '@/services/firebase';
-import { descriptorFromImage, descriptorsMatch } from '@/utils/faceCheck';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import { isValidCPF, maskCPF, onlyDigits } from '@/utils/cpf';
+import { submitCpfValidationFn, callableErrorMessage } from '@/services/api';
 import toast from 'react-hot-toast';
 
 const DocumentValidation = () => {
-  const { user } = useUserStore();
+  const { user, setUser } = useUserStore();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'pending' | 'review' | 'approved'>('pending');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
-  const [docFront, setDocFront] = useState<File | null>(null);
-  const [docBack, setDocBack] = useState<File | null>(null);
+
   const [cpf, setCpf] = useState('');
-  const [faceChecking, setFaceChecking] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -56,10 +52,6 @@ const DocumentValidation = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docFront || !docBack) {
-      toast.error('Por favor, selecione todas as imagens necessárias.');
-      return;
-    }
     if (!user) return;
 
     if (!isValidCPF(cpf)) {
@@ -67,67 +59,15 @@ const DocumentValidation = () => {
       return;
     }
 
-    if (!user.photo_url) {
-      toast.error('Adicione uma foto de perfil antes de enviar seus documentos.');
-      navigate('/profile');
-      return;
-    }
-
-    // Rosto do documento (frente) deve bater com a foto de perfil.
-    setFaceChecking(true);
-    const docFace = await descriptorFromImage(docFront);
-    setFaceChecking(false);
-    if (!docFace.ok) {
-      toast.error(
-        'Não detectamos um rosto na frente do documento. Envie uma foto nítida do RG ou da CNH.'
-      );
-      return;
-    }
-    let faceMatchDistance: number | null = null;
-    if (Array.isArray(user.faceDescriptor) && user.faceDescriptor.length === 128) {
-      const cmp = descriptorsMatch(user.faceDescriptor, docFace.descriptor);
-      if (cmp) {
-        faceMatchDistance = cmp.distance;
-        if (!cmp.match) {
-          toast.error(
-            'O rosto do documento não confere com a sua foto de perfil. Envie o seu documento e uma selfie sua.'
-          );
-          return;
-        }
-      }
-    }
-
     setSubmitting(true);
     try {
-      // Upload images
-      const uploadImage = async (file: File, path: string) => {
-        const storageRef = ref(storage, path);
-        const snapshot = await uploadBytes(storageRef, file);
-        return await getDownloadURL(snapshot.ref);
-      };
-
-      const docFrontUrl = await uploadImage(docFront, `validations/${user.id}/doc_front`);
-      const docBackUrl = await uploadImage(docBack, `validations/${user.id}/doc_back`);
-
-      // Save to firestore
-      await setDoc(doc(db, 'validations', user.id), {
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
-        cpf: onlyDigits(cpf),
-        docFrontUrl,
-        docBackUrl,
-        faceDescriptor: docFace.descriptor,
-        faceMatchDistance,
-        status: 'pending',
-        created_at: Date.now()
-      });
-
-      setStatus('review');
-      toast.success('Documentos enviados com sucesso!');
+      await submitCpfValidationFn({ cpf: onlyDigits(cpf) });
+      setStatus('approved');
+      setUser({ ...user, verified: true });
+      toast.success('CPF validado! Sua conta já está verificada.');
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao enviar documentos. Tente novamente.');
+      toast.error(callableErrorMessage(err, 'Erro ao enviar o CPF. Tente novamente.'));
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +97,7 @@ const DocumentValidation = () => {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900">Validação de documentos</h1>
+            <h1 className="text-2xl font-extrabold text-slate-900">Validação de CPF</h1>
             <p className="text-slate-500">Aumente sua credibilidade na plataforma</p>
           </div>
         </div>
@@ -165,7 +105,7 @@ const DocumentValidation = () => {
         {status === 'approved' && (
           <div className="bg-success/10 text-success p-6 rounded-2xl flex flex-col items-center text-center gap-3">
             <CheckCircle2 className="w-12 h-12" />
-            <h2 className="text-xl font-bold">Documentos validados!</h2>
+            <h2 className="text-xl font-bold">CPF validado!</h2>
             <p className="font-medium text-success/80">
               Sua conta já está verificada e você possui o selo de confiança no seu perfil.
             </p>
@@ -177,7 +117,7 @@ const DocumentValidation = () => {
             <AlertCircle className="w-12 h-12 text-amber-500" />
             <h2 className="text-xl font-bold">Em análise</h2>
             <p className="font-medium">
-              Recebemos seus documentos e nossa equipe está analisando. Esse processo pode levar até 2 dias úteis.
+              Recebemos seu CPF e nossa equipe está analisando. Esse processo pode levar até 2 dias úteis.
             </p>
           </div>
         )}
@@ -222,56 +162,12 @@ const DocumentValidation = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Documento de Identidade (RG ou CNH) - Frente</label>
-                <div className="relative border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => setDocFront(e.target.files?.[0] || null)} />
-                  {docFront ? (
-                    <div className="flex flex-col items-center">
-                      <CheckCircle2 className="w-8 h-8 text-success mb-2" />
-                      <p className="text-sm font-bold text-success">{docFront.name}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3 group-hover:text-primary transition-colors" />
-                      <p className="text-sm font-bold text-slate-700">Clique para enviar a frente</p>
-                      <p className="text-xs text-slate-500 mt-1">JPG ou PNG (Max. 5MB)</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Documento de Identidade - Verso</label>
-                <div className="relative border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => setDocBack(e.target.files?.[0] || null)} />
-                  {docBack ? (
-                    <div className="flex flex-col items-center">
-                      <CheckCircle2 className="w-8 h-8 text-success mb-2" />
-                      <p className="text-sm font-bold text-success">{docBack.name}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3 group-hover:text-primary transition-colors" />
-                      <p className="text-sm font-bold text-slate-700">Clique para enviar o verso</p>
-                      <p className="text-xs text-slate-500 mt-1">JPG ou PNG (Max. 5MB)</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
               <button
                 type="submit"
-                disabled={submitting || faceChecking}
+                disabled={submitting}
                 className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
               >
-                {faceChecking ? (
-                  <><Loader2 className="w-6 h-6 animate-spin" /> Verificando rosto…</>
-                ) : submitting ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  'Enviar documentos'
-                )}
+                {submitting ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Enviar CPF'}
               </button>
             </form>
           </>

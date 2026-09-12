@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "proposals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "requestId", "order": "ASCENDING" },
+        { "fieldPath": "professionalId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "serviceRequests",
       "queryScope": "COLLECTION",
       "fields": [

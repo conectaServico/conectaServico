@@ -19,9 +19,8 @@ const Privacy = () => {
         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
         <span>
           <strong>Rascunho.</strong> Descreve o tratamento de dados que o app realiza hoje, incluindo
-          <strong> dado pessoal sensível (biometria facial) e CPF</strong>. Deve ser revisado por
-          advogado e ter os campos entre colchetes preenchidos (empresa, encarregado/DPO) antes do
-          lançamento.
+          <strong> CPF</strong> dos profissionais. Deve ser revisado por advogado e ter os campos entre
+          colchetes preenchidos (empresa, encarregado/DPO) antes do lançamento.
         </span>
       </div>
 
@@ -40,11 +39,11 @@ const Privacy = () => {
           <strong>Cadastro:</strong> nome, e-mail, telefone, CEP e endereço, tipo de conta
           (cliente/profissional) e, para profissionais, serviços prestados e bio.
           <br />
-          <strong>Verificação de identidade (KYC — só profissionais):</strong> imagem do documento de
-          identidade (frente e verso), <strong>CPF</strong> e um <strong>vetor biométrico do rosto</strong>
-          (128 números derivados da sua foto de perfil e do rosto no documento), usado para conferir que
-          são a mesma pessoa. A imagem do rosto e do documento e esse vetor são <strong>dado pessoal
-          sensível</strong> (art. 5º, II, e art. 11 da LGPD).
+          <strong>Verificação de identidade (KYC — só profissionais):</strong> <strong>CPF</strong>,
+          submetido a análise humana para conceder o selo de verificado. A foto de perfil do
+          profissional passa por uma checagem automática de "há um rosto nítido nesta imagem" no
+          momento do upload, só para recusar fotos sem rosto (paisagem, objeto, logo) — nada dessa
+          análise é armazenado.
           <br />
           <strong>Uso do app:</strong> pedidos de serviço e seu conteúdo (descrição, fotos, endereço do
           serviço), mensagens do chat, propostas, avaliações, histórico de diamantes e desbloqueios,
@@ -64,10 +63,6 @@ const Privacy = () => {
           <strong>Executar o contrato / prestar o serviço</strong> (art. 7º, V): criar e manter a conta,
           conectar cliente e profissional, processar diamantes, chat, avaliações.
           <br />
-          <strong>Consentimento específico</strong> (art. 7º, I; art. 11, I): tratamento da biometria
-          facial e da imagem do documento para verificação de identidade. Você pode recusar — nesse caso
-          não obtém o selo de verificado e o acesso do profissional fica limitado.
-          <br />
           <strong>Cumprimento de obrigação legal/regulatória</strong> (art. 7º, II): guarda de registros
           de acesso (Marco Civil) e de dados fiscais/financeiros das transações.
           <br />
@@ -75,16 +70,7 @@ const Privacy = () => {
           melhoria do produto — sempre com avaliação de impacto e sem prejuízo aos seus direitos.
         </P>
 
-        <H>4. Biometria facial — detalhes</H>
-        <P>
-          Não guardamos "a sua digital do rosto" como imagem pesquisável: guardamos um <strong>vetor
-          numérico</strong> derivado da foto, em documento de acesso restrito (apenas você e a
-          administração). Ele é usado só para comparar selfie × documento no momento do KYC e quando
-          você troca a foto de perfil. Você pode solicitar a exclusão desse vetor a qualquer momento
-          pelo canal de suporte (isso pode remover o selo de verificado).
-        </P>
-
-        <H>5. Com quem compartilhamos</H>
+        <H>4. Com quem compartilhamos</H>
         <P>
           <strong>Com o outro usuário do pedido:</strong> seu nome, telefone e e-mail são revelados ao
           profissional <strong>somente após ele desbloquear</strong> o seu pedido. Antes disso, ele vê
@@ -101,22 +87,22 @@ const Privacy = () => {
           Não vendemos seus dados nem os usamos para publicidade de terceiros.
         </P>
 
-        <H>6. Transferência internacional</H>
+        <H>5. Transferência internacional</H>
         <P>
           Os serviços do Google Firebase podem processar e armazenar dados em servidores fora do Brasil.
           Essas transferências se apoiam nas hipóteses e salvaguardas do art. 33 da LGPD (cláusulas
           contratuais e compromissos de proteção adequada do fornecedor).
         </P>
 
-        <H>7. Por quanto tempo guardamos</H>
+        <H>6. Por quanto tempo guardamos</H>
         <P>
           Enquanto sua conta existir e pelos prazos legais aplicáveis após o encerramento (por exemplo,
           registros de acesso por 6 meses; dados fiscais/financeiros pelo prazo da legislação
-          tributária). Ao excluir a conta, apagamos perfil, documentos de identidade, arquivos e
+          tributária). Ao excluir a conta, apagamos perfil, dados de verificação, arquivos e
           anúncios em aberto; registros financeiros são mantidos e avaliações são <strong>anonimizadas</strong>.
         </P>
 
-        <H>8. Seus direitos (LGPD, art. 18)</H>
+        <H>7. Seus direitos (LGPD, art. 18)</H>
         <P>
           Você pode solicitar: confirmação e acesso aos seus dados; correção; anonimização, bloqueio ou
           eliminação de dados desnecessários ou tratados em desconformidade; portabilidade; informação
@@ -124,30 +110,30 @@ const Privacy = () => {
           app ou escreva ao encarregado ([E-MAIL DO ENCARREGADO]). Responderemos nos prazos da LGPD.
         </P>
 
-        <H>9. Segurança</H>
+        <H>8. Segurança</H>
         <P>
           Usamos regras de acesso por usuário no banco de dados, tráfego criptografado (HTTPS),
-          verificação de e-mail e telefone, e restrição de acesso a documentos e dados sensíveis apenas
+          verificação de e-mail e telefone, e restrição de acesso a dados sensíveis apenas
           ao titular e à administração. Nenhum sistema é 100% imune; em caso de incidente relevante,
           comunicaremos os titulares e a ANPD conforme a lei.
         </P>
 
-        <H>10. Cookies e armazenamento local</H>
+        <H>9. Cookies e armazenamento local</H>
         <P>
           Usamos armazenamento local do navegador para manter sua sessão e preferências. Não usamos
           cookies de rastreamento publicitário.
         </P>
 
-        <H>11. Crianças e adolescentes</H>
+        <H>10. Crianças e adolescentes</H>
         <P>O serviço é destinado a maiores de 18 anos. Não coletamos intencionalmente dados de menores.</P>
 
-        <H>12. Alterações</H>
+        <H>11. Alterações</H>
         <P>
           Podemos atualizar esta Política. Mudanças relevantes serão avisadas no app, com nova data de
           atualização no topo.
         </P>
 
-        <H>13. Contato</H>
+        <H>12. Contato</H>
         <P>Encarregado (DPO): [NOME] — [E-MAIL DO ENCARREGADO]. Suporte: suporte@conectaservico.com.</P>
       </div>
     </div>

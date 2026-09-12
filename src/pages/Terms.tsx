@@ -48,13 +48,11 @@ const Terms = () => {
         <H>3. Cadastro, verificação e veracidade</H>
         <P>
           Para usar as funções principais é necessário criar uma conta e <strong>confirmar e-mail e
-          telefone</strong>. Profissionais devem ainda enviar um <strong>documento de identidade
-          (RG ou CNH)</strong> e uma foto de rosto; a plataforma compara automaticamente o rosto da
-          selfie com o do documento e submete o material a análise humana para conceder o
-          <strong> selo de verificado</strong>. O tratamento da imagem do documento e do rosto está
-          detalhado na Política de Privacidade. Você declara que todas as informações fornecidas são
-          verdadeiras e se compromete a mantê-las atualizadas. É proibido criar conta em nome de
-          terceiro ou usar identidade falsa.
+          telefone</strong>. Profissionais devem ainda informar seu <strong>CPF</strong>, que é
+          submetido a análise humana para conceder o <strong>selo de verificado</strong>. O
+          tratamento do CPF está detalhado na Política de Privacidade. Você declara que todas as
+          informações fornecidas são verdadeiras e se compromete a mantê-las atualizadas. É proibido
+          criar conta em nome de terceiro ou usar identidade falsa.
         </P>
 
         <H>4. Regras para o Cliente</H>

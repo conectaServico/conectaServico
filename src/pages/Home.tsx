@@ -48,7 +48,7 @@ const PRO_FAQS = [
   },
   {
     q: 'Como valido meus documentos?',
-    a: 'No seu Perfil, em "Validação de documentos", envie uma foto do RG/CNH e uma selfie. Perfis verificados recebem até 3x mais contatos.',
+    a: 'No seu Perfil, em "Validação de CPF", informe seu CPF. Perfis verificados recebem até 3x mais contatos.',
   },
 ];
 

@@ -343,7 +343,7 @@ const ProHome = () => {
               'Pedidos abertos recentes'
             )}
           </p>
-          <Link to="/profile" className="text-blue-600 font-bold hover:text-blue-800 transition-colors text-sm">
+          <Link to="/profile?edit=radius" className="text-blue-600 font-bold hover:text-blue-800 transition-colors text-sm">
             {geoActive ? 'Ajustar raio' : 'Definir minha região'}
           </Link>
         </div>
