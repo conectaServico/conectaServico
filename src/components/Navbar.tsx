@@ -4,12 +4,13 @@ import { useUserStore } from '@/store/userStore';
 import { useAudienceStore } from '@/store/audienceStore';
 import {
   User,
-  MessageSquare, 
-  Home, 
-  ClipboardList, 
-  Bell, 
+  MessageSquare,
+  Home,
+  ClipboardList,
+  Bell,
   ChevronDown,
-  Plus
+  Plus,
+  Search as SearchIcon,
 } from 'lucide-react';
 import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -101,6 +102,14 @@ const Navbar = () => {
                       <span className="text-white text-xs font-bold">💎</span>
                     </div>
                     <span className="font-bold text-slate-700">{user?.coinsBalance || 0}</span>
+                  </Link>
+                )}
+
+                {/* Buscar profissionais (cliente) */}
+                {user?.role === 'client' && (
+                  <Link to="/search" className="flex items-center gap-2 text-slate-600 hover:text-primary px-3 py-2 rounded-lg transition-colors group">
+                    <SearchIcon className="w-6 h-6 group-hover:bg-slate-100 rounded" />
+                    <span className="text-sm font-semibold hidden lg:block">Buscar profissionais</span>
                   </Link>
                 )}
 
@@ -248,8 +257,8 @@ const Navbar = () => {
                             <Link to="/requests" onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors">
                               Meus Pedidos
                             </Link>
-                            <Link to="/home" onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors">
-                              Buscar Serviços
+                            <Link to="/search" onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors">
+                              Buscar Profissionais
                             </Link>
                           </div>
                         )}

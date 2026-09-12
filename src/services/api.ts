@@ -60,6 +60,23 @@ export const confirmClientPhoneFn = httpsCallable<
   { ok: boolean; phoneNumber: string }
 >(functions, 'confirmClientPhone');
 
+/**
+ * Chamada pelo cadastro de PROFISSIONAL antes de enviar o SMS: libera o
+ * número no Firebase Auth se ele estiver "ocupado" por uma conta sem perfil
+ * de profissional (órfã, ou de um cliente). Só recusa (already-exists) se já
+ * houver uma conta de profissional de fato com esse número.
+ */
+export const prepareProfessionalPhoneFn = httpsCallable<{ phone: string }, { ok: boolean }>(
+  functions,
+  'prepareProfessionalPhone'
+);
+
+/** Envia o CPF para validação (KYC). Bloqueia CPF já usado por outra conta de profissional. */
+export const submitCpfValidationFn = httpsCallable<{ cpf: string }, { ok: boolean }>(
+  functions,
+  'submitCpfValidation'
+);
+
 export const resolveSupportTicketFn = httpsCallable<
   { ticketId: string; decision: 'resolved' | 'rejected' | 'in_review'; note?: string; refundDiamonds?: number },
   { ok: boolean }

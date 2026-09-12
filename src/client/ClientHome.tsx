@@ -1,5 +1,5 @@
 import { useUserStore } from '@/store/userStore';
-import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
+import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 
@@ -57,7 +57,7 @@ const ClientHome = () => {
       name: 'Encanador',
       icon: Droplets,
       label: 'Encanadores',
-      image: 'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?auto=format&fit=crop&w=400&q=70',
+      image: 'https://images.unsplash.com/photo-1749532125405-70950966b0e5?auto=format&fit=crop&w=400&q=70',
     },
     {
       name: 'Gesseiro',
@@ -69,13 +69,13 @@ const ClientHome = () => {
       name: 'Marido de aluguel',
       icon: Wrench,
       label: 'Marido de Aluguel',
-      image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=400&q=70',
+      image: 'https://images.unsplash.com/photo-1676630656246-3047520adfdf?auto=format&fit=crop&w=400&q=70',
     },
     {
       name: 'Reformas',
       icon: Wrench,
       label: 'Reformas',
-      image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=70',
+      image: 'https://images.unsplash.com/photo-1505798577917-a65157d3320a?auto=format&fit=crop&w=400&q=70',
     },
   ];
 
@@ -102,18 +102,24 @@ const ClientHome = () => {
         <BannerCarousel banners={clientBanners} />
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Link to="/request/new" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <PlusCircle className="w-6 h-6" />
+        <div className="grid grid-cols-3 gap-3">
+          <Link to="/request/new" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <PlusCircle className="w-5 h-5" />
             </div>
-            <span className="font-semibold text-slate-700 text-sm">Novo Pedido</span>
+            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Novo Pedido</span>
           </Link>
-          <Link to="/requests" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <ClipboardList className="w-6 h-6" />
+          <Link to="/search" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <Search className="w-5 h-5" />
             </div>
-            <span className="font-semibold text-slate-700 text-sm">Meus Pedidos</span>
+            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Buscar Profissionais</span>
+          </Link>
+          <Link to="/requests" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Meus Pedidos</span>
           </Link>
         </div>
 
@@ -149,7 +155,7 @@ const ClientHome = () => {
         {/* Banner */}
         <div className="relative rounded-2xl overflow-hidden shadow-lg h-44">
           <img
-            src="https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=75"
+            src="https://images.unsplash.com/photo-1787672357797-f5fa35bb0d18?auto=format&fit=crop&crop=focalpoint&fp-x=0.65&fp-y=0.35&w=800&h=350&q=75"
             alt="Profissional prestando serviço"
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover"

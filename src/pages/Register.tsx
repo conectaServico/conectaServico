@@ -14,7 +14,7 @@ import { buildGeoFields } from '@/utils/geo';
 import { CATEGORIES_MAP } from '@/utils/categories';
 import { toE164BR } from '@/hooks/useVerified';
 import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
-import { markVerifiedFn } from '@/services/api';
+import { markVerifiedFn, prepareProfessionalPhoneFn, callableErrorMessage } from '@/services/api';
 import { useUserStore } from '@/store/userStore';
 import OtpInput from '@/components/OtpInput';
 
@@ -170,13 +170,17 @@ const Register = () => {
     }
     setSendingOtp(true);
     try {
+      // Libera o número no Firebase Auth se estiver "ocupado" por uma conta
+      // sem perfil de profissional (órfã, ou de um cliente) — só recusa se já
+      // houver de fato uma conta de profissional com esse número.
+      await prepareProfessionalPhoneFn({ phone: e164 });
       confirmationRef.current = await sendOtp(e164, RECAPTCHA_ID);
       setOtpSent(true);
       setOtpCode('');
       setResendCooldown(RESEND_SECONDS);
     } catch (err) {
       console.error('Falha ao enviar SMS:', err);
-      setError('Não foi possível enviar o SMS. Confira o número e tente de novo.');
+      setError(callableErrorMessage(err, 'Não foi possível enviar o SMS. Confira o número e tente de novo.'));
     } finally {
       setSendingOtp(false);
     }

@@ -71,7 +71,7 @@ const PublicProfile = () => {
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center justify-center sm:justify-start gap-2">
-                    {profile.name}
+                    {profile.name || 'Profissional'}
                     {profile.verified && <ShieldCheck className="w-6 h-6 text-success" />}
                   </h1>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-2 text-sm text-slate-500 font-medium">

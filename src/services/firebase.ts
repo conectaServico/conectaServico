@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { initializeFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator, type Functions } from 'firebase/functions';
 
@@ -35,7 +35,11 @@ if (app && import.meta.env.VITE_FIREBASE_APPCHECK_RECAPTCHA_KEY) {
 }
 
 export const auth = (app ? getAuth(app) : null) as Auth;
-export const db = (app ? getFirestore(app) : null) as Firestore;
+// ignoreUndefinedProperties: campos opcionais no app viram `undefined` (ex.:
+// hasBlueprint/preferredDate quando não respondidos) e addDoc/setDoc rejeitam
+// isso por padrão — em vez de caçar cada `?? undefined` no código, o SDK
+// já descarta essas chaves antes de gravar.
+export const db = (app ? initializeFirestore(app, { ignoreUndefinedProperties: true }) : null) as Firestore;
 export const storage = (app ? getStorage(app) : null) as FirebaseStorage;
 export const functions = (app ? getFunctions(app, FUNCTIONS_REGION) : null) as Functions;
 

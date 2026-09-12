@@ -284,7 +284,7 @@ const Search = () => {
                           <div>
                             <Link to={`/user/${prof.id}`} className="block group-hover:text-primary transition-colors">
                               <h3 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-                                {prof.name}
+                                {prof.name || 'Profissional'}
                                 {prof.verified && <ShieldCheck className="w-5 h-5 text-success" />}
                               </h3>
                             </Link>

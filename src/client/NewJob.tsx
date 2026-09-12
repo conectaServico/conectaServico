@@ -142,6 +142,11 @@ const NewJob = () => {
     setLoading(true);
     setError('');
 
+    // Diagnóstico temporário: cada etapa marca `step` antes de rodar, para o
+    // catch dizer exatamente qual delas falhou em vez de só "Erro ao enviar
+    // pedido" — não temos acesso a logs de produção nem ao emulador local
+    // (falta Java) para descobrir isso de outro jeito. Reverter depois.
+    let step = 'consulta de duplicidade';
     try {
       // Evita pedido duplicado: já tem um em aberto/negociação para o mesmo serviço?
       const dupSnap = await getDocs(
@@ -161,6 +166,7 @@ const NewJob = () => {
         return;
       }
 
+      step = 'geocodificação';
       // Localização normalizada (uf/cityKey/lat/lng/geohash) para a busca por raio
       // do profissional. Nunca bloqueia o envio: se o geocode falhar, volta {}.
       const geo = await buildGeoFields({ cep, uf: stateUF, city, street });
@@ -193,6 +199,7 @@ const NewJob = () => {
         ...geo,
       };
 
+      step = 'criação do pedido';
       const docRef = await addDoc(collection(db, 'serviceRequests'), requestData);
 
       // Fotos: sobem depois do create (precisam do id) e não bloqueiam o pedido.
@@ -206,6 +213,7 @@ const NewJob = () => {
       }
 
       if (profId) {
+        step = 'conexão com o profissional';
         // Orçamento direto: a proposta aceita + a 1ª mensagem são criadas no servidor.
         const { data } = await attachProfessionalToRequestFn({
           requestId: docRef.id,
@@ -218,8 +226,8 @@ const NewJob = () => {
 
       navigate('/request/success');
     } catch (err) {
-      console.error(err);
-      setError(callableErrorMessage(err, 'Erro ao enviar pedido. Tente novamente.'));
+      console.error(`Falha em "${step}":`, err);
+      setError(`[${step}] ${callableErrorMessage(err, 'Erro ao enviar pedido. Tente novamente.')}`);
     } finally {
       setLoading(false);
     }
