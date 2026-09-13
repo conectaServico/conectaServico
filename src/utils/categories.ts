@@ -2,23 +2,17 @@ import {
   Wrench,
   Smartphone,
   Hammer,
-  Droplets
+  Droplets,
+  Users
 } from 'lucide-react';
 
 export const CATEGORY_MENUS = [
   {
-    name: 'Assistência técnica',
-    slug: 'assistencia-tecnica',
+    name: 'Serviços gerais',
+    slug: 'servicos-gerais',
     icon: Wrench,
-    items: ['Aquecedor a gás', 'Ar condicionado', 'Geladeira e freezer', 'Máquina de lavar', 'Técnico de celular', 'Técnico de informática'],
-    image: 'https://images.unsplash.com/photo-1721333089073-215a56fd710c?auto=format&fit=crop&w=800&q=80'
-  },
-  {
-    name: 'Design e Tecnologia',
-    slug: 'design-e-tecnologia',
-    icon: Smartphone,
-    items: ['Desenvolvedor de sites', 'Designer gráfico', 'Marketing digital', 'Edição de vídeo'],
-    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80'
+    items: ['Marido de aluguel', 'Fretes e mudanças', 'Instalador de câmeras', 'Segurança e alarmes', 'Aulas particulares'],
+    image: 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&w=800&q=80'
   },
   {
     name: 'Construção e reformas',
@@ -31,15 +25,29 @@ export const CATEGORY_MENUS = [
     name: 'Limpeza e manutenção',
     slug: 'limpeza-e-manutencao',
     icon: Droplets,
-    items: ['Diarista', 'Babá', 'Cozinheira', 'Limpeza pós-obra', 'Jardinagem', 'Piscineiro', 'Dedetização', 'Lavagem de sofá', 'Limpeza de caixa d’água'],
-    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80'
+    items: ['Limpeza pós-obra', 'Jardinagem', 'Piscineiro', 'Dedetização', 'Lavagem de sofá', 'Limpeza de caixa d’água'],
+    image: 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?auto=format&fit=crop&w=800&q=80'
   },
   {
-    name: 'Serviços gerais',
-    slug: 'servicos-gerais',
+    name: 'Assistência técnica',
+    slug: 'assistencia-tecnica',
     icon: Wrench,
-    items: ['Marido de aluguel', 'Fretes e mudanças', 'Instalador de câmeras', 'Segurança e alarmes', 'Aulas particulares'],
-    image: 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&w=800&q=80'
+    items: ['Ar condicionado', 'Máquina de lavar', 'Técnico de informática', 'Aquecedor a gás', 'Geladeira e freezer', 'Técnico de celular'],
+    image: 'https://images.unsplash.com/photo-1721333089073-215a56fd710c?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    name: 'Serviços domésticos',
+    slug: 'servicos-domesticos',
+    icon: Users,
+    items: ['Babá', 'Cozinheira', 'Diarista'],
+    image: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    name: 'Design e Tecnologia',
+    slug: 'design-e-tecnologia',
+    icon: Smartphone,
+    items: ['Desenvolvedor de sites', 'Designer gráfico', 'Marketing digital', 'Edição de vídeo'],
+    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80'
   }
 ];
 
@@ -156,8 +164,9 @@ const DESCRIPTION_PLACEHOLDERS: Record<string, string> = {
   'Construção e reformas': 'Ex: Preciso pintar 3 cômodos do apartamento (sala e 2 quartos). As paredes não têm infiltração, mas precisam de massa corrida em alguns pontos...',
   'Assistência técnica': 'Ex: Meu ar condicionado não está gelando e faz um ruído estranho ao ligar. Preciso de uma avaliação e do conserto o quanto antes...',
   'Design e Tecnologia': 'Ex: Preciso de um site institucional com 5 páginas pra minha empresa, com formulário de contato e integração com WhatsApp...',
-  'Limpeza e manutenção': 'Ex: Preciso de uma diarista quinzenal pra limpeza geral de um apartamento de 2 quartos, incluindo cozinha e banheiros...',
+  'Limpeza e manutenção': 'Ex: Preciso limpar a caixa d\'água e fazer uma dedetização preventiva no apartamento antes de mudar...',
   'Serviços gerais': 'Ex: Preciso instalar 2 prateleiras e trocar uma fechadura. Já tenho os materiais, só preciso da mão de obra...',
+  'Serviços domésticos': 'Ex: Preciso de uma diarista quinzenal pra limpeza geral de um apartamento de 2 quartos, incluindo cozinha e banheiros...',
 };
 const DEFAULT_DESCRIPTION_PLACEHOLDER = 'Ex: Descreva o que precisa, com detalhes como medidas, prazos e preferências que ajudem o profissional a entender o serviço...';
 

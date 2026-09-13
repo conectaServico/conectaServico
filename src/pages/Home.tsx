@@ -1,5 +1,5 @@
 import { useUserStore } from '@/store/userStore';
-import { Star, Smartphone, Clock, ThumbsUp, Coins, ShieldCheck, Wrench, Zap, Droplets, Hammer, MessageSquare, CheckCircle, ChevronLeft, ChevronRight, Search, Laptop, MapPin, Percent, HelpCircle } from 'lucide-react';
+import { Star, Smartphone, Clock, ThumbsUp, Coins, ShieldCheck, Wrench, Zap, Hammer, MessageSquare, CheckCircle, ChevronLeft, ChevronRight, Search, Laptop, MapPin, Percent, HelpCircle, Users } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useRef } from 'react';
 import ProHome from '@/professional/ProHome';
@@ -218,11 +218,11 @@ const Home = () => {
                       </Link>
 
                       {/* Card 2 */}
-                      <Link to="/categoria/limpeza-e-manutencao?servico=Diarista" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
+                      <Link to="/categoria/servicos-domesticos?servico=Diarista" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
                         <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 mb-6 group-hover:scale-110 transition-transform">
-                          <Droplets className="w-7 h-7" />
+                          <Users className="w-7 h-7" />
                         </div>
-                        <p className="text-blue-500 font-medium text-sm mb-2">Limpeza e manutenção</p>
+                        <p className="text-blue-500 font-medium text-sm mb-2">Serviços domésticos</p>
                         <h3 className="text-xl font-bold text-blue-950 mb-6 group-hover:text-blue-600 transition-colors">Limpeza diária</h3>
 
                         <div className="space-y-3">
