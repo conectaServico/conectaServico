@@ -1,6 +1,7 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, onRequest, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import * as crypto from 'crypto';
 import * as admin from 'firebase-admin';
@@ -21,6 +22,7 @@ setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10, invoker: 'pub
 const UNLOCK_COST = 10;
 const SIGNUP_BONUS = 100;
 const MAX_UNLOCKS = 3;
+const REQUEST_EXPIRY_DAYS = 2; // pedido aberto sem proposta aceita expira depois disso
 const DEFAULT_RADIUS_KM = 25;
 const MAX_OPEN_REQUESTS_PER_CLIENT = 15;
 const REFERRAL_BONUS = 100; // diamantes para quem indicou, quando o indicado verifica a conta
@@ -414,8 +416,8 @@ export const reopenRequest = onCall(wrapCallable(async (req) => {
     if (!snap.exists) throw new HttpsError('not-found', 'Pedido não encontrado.');
     const r = snap.data() as Record<string, unknown>;
     if (r.clientId !== uid) throw new HttpsError('permission-denied', 'Você não é o dono deste pedido.');
-    if (r.status !== 'CANCELED') {
-      throw new HttpsError('failed-precondition', 'Só dá para reabrir um pedido cancelado.');
+    if (!['CANCELED', 'EXPIRED'].includes(String(r.status))) {
+      throw new HttpsError('failed-precondition', 'Só dá para reabrir um pedido cancelado ou expirado.');
     }
     // Mantém unlockCount e os unlocks: quem já pagou continua com o contato.
     tx.update(reqRef, {
@@ -430,7 +432,7 @@ export const reopenRequest = onCall(wrapCallable(async (req) => {
 
 // ---------------------------------------------------------------------------
 // 3c. Excluir pedido (cliente) — some de vez, junto com propostas/unlocks/mensagens.
-// Permitido só em OPEN ou CANCELED. Sem reembolso.
+// Permitido só em OPEN, CANCELED ou EXPIRED. Sem reembolso.
 // ---------------------------------------------------------------------------
 export const deleteRequest = onCall(wrapCallable(async (req) => {
   const uid = assertAuth(req);
@@ -442,8 +444,8 @@ export const deleteRequest = onCall(wrapCallable(async (req) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Pedido não encontrado.');
   const r = snap.data() as Record<string, unknown>;
   if (r.clientId !== uid) throw new HttpsError('permission-denied', 'Você não é o dono deste pedido.');
-  if (!['OPEN', 'CANCELED'].includes(String(r.status))) {
-    throw new HttpsError('failed-precondition', 'Só dá para excluir um pedido aberto ou cancelado.');
+  if (!['OPEN', 'CANCELED', 'EXPIRED'].includes(String(r.status))) {
+    throw new HttpsError('failed-precondition', 'Só dá para excluir um pedido aberto, cancelado ou expirado.');
   }
 
   const [props, unlocks, msgs] = await Promise.all([
@@ -465,6 +467,42 @@ export const deleteRequest = onCall(wrapCallable(async (req) => {
 
   return { ok: true };
 }));
+
+// ---------------------------------------------------------------------------
+// 3c-bis. Expira pedidos abertos há mais de REQUEST_EXPIRY_DAYS sem proposta
+// aceita — evita pedido "morto" acumulando no feed dos profissionais pra
+// sempre. Roda de hora em hora; cliente pode reabrir depois (reopenRequest).
+// ---------------------------------------------------------------------------
+export const expireOldRequests = onSchedule('every 1 hours', async () => {
+  const cutoff = Date.now() - REQUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  const snap = await db
+    .collection('serviceRequests')
+    .where('status', '==', 'OPEN')
+    .where('created_at', '<', cutoff)
+    .get();
+  if (snap.empty) return;
+
+  const now = Date.now();
+  const writer = db.bulkWriter();
+  for (const doc of snap.docs) {
+    writer.update(doc.ref, { status: 'EXPIRED', updated_at: now });
+  }
+  await writer.close();
+
+  await Promise.all(
+    snap.docs.map((doc) => {
+      const r = doc.data() as Record<string, unknown>;
+      const clientId = String(r.clientId || '');
+      if (!clientId) return Promise.resolve();
+      return notify(clientId, {
+        type: 'request_expired',
+        title: 'Pedido expirado',
+        body: `Seu pedido de ${(r.subcategory as string) || (r.category as string) || 'serviço'} expirou após ${REQUEST_EXPIRY_DAYS} dias sem ninguém escolhido. Você pode reabrir quando quiser.`,
+        link: `/requests/${doc.id}`,
+      });
+    })
+  );
+});
 
 // ---------------------------------------------------------------------------
 // 3d. Acompanhamento do serviço (cliente): iniciar / concluir.

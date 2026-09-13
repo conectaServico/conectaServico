@@ -74,7 +74,7 @@ export interface PublicProfile {
   created_at: number;
 }
 
-export type RequestStatus = 'OPEN' | 'NEGOTIATING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED';
+export type RequestStatus = 'OPEN' | 'NEGOTIATING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED' | 'EXPIRED';
 export type Urgency = 'Baixa (Pode esperar)' | 'Média (Próximas semanas)' | 'Alta (O quanto antes)' | 'Emergência (Imediato)';
 export type MaterialOption = 'O profissional fornece' | 'Eu fornecerei' | 'A combinar';
 

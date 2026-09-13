@@ -156,6 +156,7 @@ const RequestDetails = () => {
       case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'COMPLETED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
       case 'CANCELED': return 'bg-red-100 text-red-800 border-red-200';
+      case 'EXPIRED': return 'bg-slate-200 text-slate-700 border-slate-300';
       default: return 'bg-slate-100 text-slate-800 border-slate-200';
     }
   };
@@ -167,6 +168,7 @@ const RequestDetails = () => {
       case 'IN_PROGRESS': return 'Em andamento';
       case 'COMPLETED': return 'Finalizado';
       case 'CANCELED': return 'Cancelado';
+      case 'EXPIRED': return 'Expirado';
       default: return status;
     }
   };
@@ -572,7 +574,7 @@ const RequestDetails = () => {
                   <X className="w-4 h-4" /> Cancelar pedido
                 </button>
               )}
-              {request.status === 'CANCELED' && (
+              {['CANCELED', 'EXPIRED'].includes(request.status) && (
                 <button
                   onClick={handleReopen}
                   disabled={updatingStatus}
@@ -581,7 +583,7 @@ const RequestDetails = () => {
                   {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Reabrir pedido</>}
                 </button>
               )}
-              {['OPEN', 'CANCELED'].includes(request.status) && (
+              {['OPEN', 'CANCELED', 'EXPIRED'].includes(request.status) && (
                 <button
                   onClick={() => { setConfirmAction({ proposalId: 'delete', professionalId: 'delete' }); setIsConfirmOpen(true); }}
                   disabled={updatingStatus}
@@ -954,7 +956,14 @@ const RequestDetails = () => {
                       onClick={() => {
                         const cleanPhone = clientPhone.replace(/\D/g, '');
                         const waNumber = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
-                        const text = encodeURIComponent(`Olá, vi seu pedido no Conecta Serviço e gostaria de conversar.`);
+                        const clientFirstName = (clientName || request.clientName || '').split(' ')[0];
+                        const proFirstName = (user?.name || '').split(' ')[0];
+                        const serviceLabel = request.subcategory || request.category;
+                        const greeting = clientFirstName ? `Olá, ${clientFirstName}!` : 'Olá!';
+                        const intro = proFirstName ? ` Sou o ${proFirstName}, profissional da Conecta Serviço.` : ' Sou profissional da Conecta Serviço.';
+                        const text = encodeURIComponent(
+                          `${greeting}${intro} Vi seu pedido de ${serviceLabel} e gostaria de conversar sobre o serviço.`
+                        );
                         window.open(`https://wa.me/${waNumber}?text=${text}`, '_blank');
                       }}
                       className="w-full bg-[#25D366] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#128C7E] transition-all flex items-center justify-center gap-2 shadow-sm"

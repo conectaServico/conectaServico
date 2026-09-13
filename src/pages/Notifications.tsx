@@ -9,6 +9,7 @@ function iconFor(type: string) {
     case 'proposal_new':
     case 'proposal_accepted':
     case 'proposal_rejected':
+    case 'request_expired':
       return <Briefcase className="w-5 h-5" />;
     case 'review_received':
       return <Star className="w-5 h-5" />;

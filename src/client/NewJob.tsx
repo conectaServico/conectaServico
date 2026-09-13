@@ -1,23 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/services/firebase';
-import { attachProfessionalToRequestFn, callableErrorMessage } from '@/services/api';
+import { RecaptchaVerifier, PhoneAuthProvider } from 'firebase/auth';
+import { auth, db } from '@/services/firebase';
+import { attachProfessionalToRequestFn, confirmClientPhoneFn, callableErrorMessage } from '@/services/api';
 import { buildGeoFields } from '@/utils/geo';
 import { buildSearchTokens } from '@/utils/search';
 import { uploadImages } from '@/utils/images';
 import { useUserStore } from '@/store/userStore';
-import { useVerified } from '@/hooks/useVerified';
-import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2, ImagePlus, X } from 'lucide-react';
+import { useVerified, toE164BR } from '@/hooks/useVerified';
+import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2, ImagePlus, X, Phone } from 'lucide-react';
 import { ServiceRequest, Urgency, MaterialOption } from '@/types';
-import { maskCEP } from '@/utils/masks';
+import { maskCEP, maskPhone } from '@/utils/masks';
+import OtpInput from '@/components/OtpInput';
 
 import { CATEGORIES_MAP, MAIN_CATEGORIES } from '@/utils/categories';
 
 const PROPERTY_TYPES = ['Casa', 'Apartamento', 'Comercial', 'Condomínio'];
 
 const NewJob = () => {
-  const { user } = useUserStore();
+  const { user, setUser } = useUserStore();
   const { verified } = useVerified();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -72,6 +74,88 @@ const NewJob = () => {
   const [number, setNumber] = useState('');
   const [complement, setComplement] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
+
+  // Confirmação de celular por SMS — obrigatória antes de publicar, pra garantir
+  // que o profissional consiga contatar o cliente pelo número certo.
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [phoneConfirmed, setPhoneConfirmed] = useState(!!user?.phoneConfirmed);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [confirmingOtp, setConfirmingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const verificationIdRef = useRef('');
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  useEffect(() => {
+    return () => {
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    };
+  }, []);
+
+  const ensureRecaptcha = () => {
+    if (!recaptchaRef.current) {
+      recaptchaRef.current = new RecaptchaVerifier(auth, 'newjob-recaptcha-container', { size: 'invisible' });
+    }
+    return recaptchaRef.current;
+  };
+
+  const sendPhoneCode = async () => {
+    const e164 = toE164BR(phone);
+    if (e164.replace(/\D/g, '').length < 12) {
+      setError('Informe um celular válido com DDD.');
+      return;
+    }
+    setError('');
+    setSendingOtp(true);
+    try {
+      const provider = new PhoneAuthProvider(auth);
+      const id = await provider.verifyPhoneNumber(e164, ensureRecaptcha());
+      verificationIdRef.current = id;
+      setOtpSent(true);
+      setOtpCode('');
+      setResendCooldown(30);
+    } catch (err) {
+      console.error('Falha ao enviar SMS:', err);
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+      setError('Não foi possível enviar o SMS. Confira o número e tente de novo.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const resendPhoneCode = () => {
+    if (resendCooldown > 0 || sendingOtp) return;
+    sendPhoneCode();
+  };
+
+  const confirmPhoneCode = async (code: string) => {
+    if (!verificationIdRef.current || code.length < 6 || confirmingOtp) return;
+    setConfirmingOtp(true);
+    setError('');
+    try {
+      await confirmClientPhoneFn({ verificationId: verificationIdRef.current, code: code.trim() });
+      if (user && phone !== user.phone) {
+        await updateDoc(doc(db, 'users', user.id), { phone });
+      }
+      setPhoneConfirmed(true);
+      if (user) setUser({ ...user, phone, phoneConfirmed: true, phoneConfirmedAt: Date.now() });
+    } catch (err) {
+      console.error(err);
+      setError(callableErrorMessage(err, 'Código incorreto. Confira o SMS e tente de novo.'));
+      setOtpCode('');
+    } finally {
+      setConfirmingOtp(false);
+    }
+  };
 
   const fetchCepData = async (currentCep: string) => {
     const cleanCep = currentCep.replace(/\D/g, '');
@@ -139,14 +223,13 @@ const NewJob = () => {
       navigate('/verify');
       return;
     }
+    if (!phoneConfirmed) {
+      setError('Confirme seu celular por SMS antes de publicar o pedido.');
+      return;
+    }
     setLoading(true);
     setError('');
 
-    // Diagnóstico temporário: cada etapa marca `step` antes de rodar, para o
-    // catch dizer exatamente qual delas falhou em vez de só "Erro ao enviar
-    // pedido" — não temos acesso a logs de produção nem ao emulador local
-    // (falta Java) para descobrir isso de outro jeito. Reverter depois.
-    let step = 'consulta de duplicidade';
     try {
       // Evita pedido duplicado: já tem um em aberto/negociação para o mesmo serviço?
       const dupSnap = await getDocs(
@@ -166,7 +249,6 @@ const NewJob = () => {
         return;
       }
 
-      step = 'geocodificação';
       // Localização normalizada (uf/cityKey/lat/lng/geohash) para a busca por raio
       // do profissional. Nunca bloqueia o envio: se o geocode falhar, volta {}.
       const geo = await buildGeoFields({ cep, uf: stateUF, city, street });
@@ -199,7 +281,6 @@ const NewJob = () => {
         ...geo,
       };
 
-      step = 'criação do pedido';
       const docRef = await addDoc(collection(db, 'serviceRequests'), requestData);
 
       // Fotos: sobem depois do create (precisam do id) e não bloqueiam o pedido.
@@ -213,7 +294,6 @@ const NewJob = () => {
       }
 
       if (profId) {
-        step = 'conexão com o profissional';
         // Orçamento direto: a proposta aceita + a 1ª mensagem são criadas no servidor.
         const { data } = await attachProfessionalToRequestFn({
           requestId: docRef.id,
@@ -226,8 +306,8 @@ const NewJob = () => {
 
       navigate('/request/success');
     } catch (err) {
-      console.error(`Falha em "${step}":`, err);
-      setError(`[${step}] ${callableErrorMessage(err, 'Erro ao enviar pedido. Tente novamente.')}`);
+      console.error(err);
+      setError(callableErrorMessage(err, 'Erro ao enviar pedido. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -600,6 +680,85 @@ const NewJob = () => {
             </div>
 
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 mt-8">
+              <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <Phone className="w-5 h-5 text-primary" />
+                Confirme seu celular
+              </h4>
+              <p className="text-sm text-slate-500 mb-4">
+                É o número que o profissional vai usar pra falar com você. Confirme por SMS antes de publicar.
+              </p>
+
+              {phoneConfirmed ? (
+                <div className="flex items-center gap-2 text-success font-bold text-sm">
+                  <CheckCircle2 className="w-5 h-5" /> Celular confirmado: {phone}
+                </div>
+              ) : !otpSent ? (
+                <>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    className="w-full p-3 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:ring-2 focus:ring-primary focus:border-transparent mb-3"
+                    placeholder="(11) 99999-9999"
+                    value={phone}
+                    onChange={(e) => setPhone(maskPhone(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    onClick={sendPhoneCode}
+                    disabled={sendingOtp}
+                    className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm hover:bg-primary-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar código por SMS'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Digite o código de 6 dígitos enviado para <strong>{toE164BR(phone)}</strong>.
+                  </p>
+                  <OtpInput
+                    value={otpCode}
+                    onChange={setOtpCode}
+                    onComplete={confirmPhoneCode}
+                    active={otpSent}
+                    disabled={confirmingOtp}
+                    className="w-full p-3 border border-slate-300 rounded-xl bg-white text-slate-900 outline-none focus:ring-2 focus:ring-primary focus:border-transparent mb-3 tracking-[0.5em] text-center font-bold text-lg"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => confirmPhoneCode(otpCode)}
+                      disabled={confirmingOtp || otpCode.length < 6}
+                      className="flex-1 bg-primary text-white py-3 rounded-xl font-bold text-sm hover:bg-primary-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {confirmingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setOtpSent(false); setOtpCode(''); setResendCooldown(0); }}
+                      className="px-4 py-3 rounded-xl font-bold text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                    >
+                      Trocar número
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resendPhoneCode}
+                    disabled={resendCooldown > 0 || sendingOtp}
+                    className="w-full mt-2 text-center text-sm font-bold text-primary hover:underline disabled:no-underline disabled:text-slate-400 disabled:cursor-not-allowed py-1"
+                  >
+                    {sendingOtp
+                      ? 'Reenviando…'
+                      : resendCooldown > 0
+                        ? `Reenviar código em ${resendCooldown}s`
+                        : 'Não recebeu? Reenviar código'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 mt-8">
               <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-success" />
                 Resumo do Pedido
@@ -641,7 +800,8 @@ const NewJob = () => {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || !phoneConfirmed}
+              title={!phoneConfirmed ? 'Confirme seu celular por SMS antes de publicar' : undefined}
               className="flex-1 bg-success text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-md shadow-success/20"
             >
               {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Enviar Pedido'}
@@ -649,6 +809,7 @@ const NewJob = () => {
           )}
         </div>
       </div>
+      <div id="newjob-recaptcha-container" />
     </div>
   );
 };
