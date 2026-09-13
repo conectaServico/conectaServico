@@ -586,6 +586,7 @@ export const attachProfessionalToRequest = onCall(wrapCallable(async (req) => {
     professionalName: (pro.name as string) || '',
     professionalPhoto: (pro.photo_url as string) || '',
     professionalRating: (pro.rating as number) || 0,
+    professionalVerified: (pro.verified as boolean) || false,
     estimatedPrice: 0,
     estimatedDays: 'A combinar',
     message: 'Solicitação de orçamento direto.',

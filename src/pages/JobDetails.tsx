@@ -267,6 +267,7 @@ const RequestDetails = () => {
           professionalName: user.name,
           professionalPhoto: user.photo_url || '',
           professionalRating: user.rating || 5.0,
+          professionalVerified: user.verified || false,
           estimatedPrice: 0,
           estimatedDays: 'A combinar',
           message: message.trim(),
@@ -1137,9 +1138,11 @@ const RequestDetails = () => {
                         )}
                         <div>
                           <p className="font-bold text-slate-900 text-lg leading-tight group-hover:text-primary transition-colors">{p.professionalName || `Profissional #${p.professionalId.substring(0, 4)}`}</p>
-                          <div className="flex items-center gap-1 text-success text-[11px] font-bold mt-1 bg-success/10 w-fit px-2 py-0.5 rounded-full">
-                            <ShieldCheck className="w-3 h-3" /> VERIFICADO
-                          </div>
+                          {p.professionalVerified && (
+                            <div className="flex items-center gap-1 text-success text-[11px] font-bold mt-1 bg-success/10 w-fit px-2 py-0.5 rounded-full">
+                              <ShieldCheck className="w-3 h-3" /> VERIFICADO
+                            </div>
+                          )}
                           {p.professionalRating && (
                             <div className="flex items-center gap-1 mt-2 text-sm font-bold text-slate-700">
                               <span className="text-amber-500">★</span> {p.professionalRating.toFixed(1)}

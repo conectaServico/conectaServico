@@ -138,6 +138,7 @@ export interface Proposal {
   professionalName?: string;
   professionalRating?: number;
   professionalPhoto?: string;
+  professionalVerified?: boolean;
 }
 
 export interface Chat {
