@@ -540,80 +540,16 @@ export const startWork = onCall(wrapCallable((req) => advanceRequestStatus(req, 
 export const completeWork = onCall(wrapCallable((req) => advanceRequestStatus(req, 'IN_PROGRESS', 'COMPLETED', 'completed_at')));
 
 // ---------------------------------------------------------------------------
-// 4. Orçamento direto pelo perfil do profissional
+// 4. [DESATIVADA] Orçamento direto pelo perfil do profissional.
+// Deixava o cliente escolher um profissional específico e criar uma proposta
+// "accepted" na hora, sem NINGUÉM pagar diamante — furava o modelo de negócio
+// (o profissional só deveria chegar ao cliente desbloqueando um pedido com
+// diamantes). Mantida como export (em vez de apagada) só pra o deploy
+// atualizar em vez de precisar recriar a function; ela sempre recusa.
 // ---------------------------------------------------------------------------
 export const attachProfessionalToRequest = onCall(wrapCallable(async (req) => {
-  const uid = assertVerified(req);
-  const requestId = String(req.data?.requestId || '').trim();
-  const professionalId = String(req.data?.professionalId || '').trim();
-  const firstMessage = String(req.data?.message || '').slice(0, 2000);
-  if (!requestId || !professionalId) throw new HttpsError('invalid-argument', 'Dados incompletos.');
-
-  const reqRef = db.doc(`serviceRequests/${requestId}`);
-  const [reqSnap, proSnap, existingProp] = await Promise.all([
-    reqRef.get(),
-    db.doc(`users/${professionalId}`).get(),
-    db
-      .collection('proposals')
-      .where('requestId', '==', requestId)
-      .where('professionalId', '==', professionalId)
-      .limit(1)
-      .get(),
-  ]);
-
-  if (!reqSnap.exists) throw new HttpsError('not-found', 'Pedido não encontrado.');
-  const reqData = reqSnap.data() as Record<string, unknown>;
-  if (reqData.clientId !== uid) {
-    throw new HttpsError('permission-denied', 'Você não é o dono deste pedido.');
-  }
-  if (!proSnap.exists || proSnap.data()?.role !== 'professional') {
-    throw new HttpsError('not-found', 'Profissional não encontrado.');
-  }
-  if (!existingProp.empty) {
-    throw new HttpsError('already-exists', 'Você já iniciou uma conversa com este profissional para este pedido.');
-  }
-
-  const now = Date.now();
-  const pro = proSnap.data() as Record<string, unknown>;
-  const chatId = `${requestId}_${professionalId}`;
-  const propRef = db.collection('proposals').doc();
-  const batch = db.batch();
-
-  batch.set(propRef, {
-    requestId,
-    professionalId,
-    clientId: uid,
-    professionalName: (pro.name as string) || '',
-    professionalPhoto: (pro.photo_url as string) || '',
-    professionalRating: (pro.rating as number) || 0,
-    professionalVerified: (pro.verified as boolean) || false,
-    estimatedPrice: 0,
-    estimatedDays: 'A combinar',
-    message: 'Solicitação de orçamento direto.',
-    status: 'accepted',
-    created_at: now,
-    updated_at: now,
-  });
-  batch.update(reqRef, {
-    status: 'NEGOTIATING',
-    acceptedProfessionalId: professionalId,
-    acceptedProposalId: propRef.id,
-    updated_at: now,
-  });
-  batch.set(db.collection('messages').doc(), {
-    chatId,
-    senderId: uid,
-    text:
-      firstMessage ||
-      `Olá! Solicitei um orçamento pelo seu perfil para "${
-        (reqData.subcategory as string) || (reqData.category as string) || 'um serviço'
-      }". Aguardo seu retorno!`,
-    created_at: now,
-    read: false,
-  });
-
-  await batch.commit();
-  return { ok: true, chatId };
+  assertVerified(req);
+  throw new HttpsError('failed-precondition', 'Orçamento direto não está mais disponível. Publique um pedido para receber propostas de profissionais.');
 }));
 
 // ---------------------------------------------------------------------------

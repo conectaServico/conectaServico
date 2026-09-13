@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { RecaptchaVerifier, PhoneAuthProvider } from 'firebase/auth';
 import { auth, db } from '@/services/firebase';
-import { attachProfessionalToRequestFn, confirmClientPhoneFn, callableErrorMessage } from '@/services/api';
+import { confirmClientPhoneFn, callableErrorMessage } from '@/services/api';
 import { buildGeoFields } from '@/utils/geo';
 import { buildSearchTokens } from '@/utils/search';
 import { uploadImages } from '@/utils/images';
@@ -23,7 +23,6 @@ const NewJob = () => {
   const { verified } = useVerified();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const profId = searchParams.get('profId');
   const defaultCategory = searchParams.get('category');
   const defaultSubcategory = searchParams.get('subcategory');
   
@@ -243,7 +242,7 @@ const NewJob = () => {
         const r = d.data();
         return r.category === category && (r.subcategory || '') === (subcategory || '');
       });
-      if (dup && !profId) {
+      if (dup) {
         setLoading(false);
         setError('Você já tem um pedido aberto para esse serviço. Acompanhe ou cancele o atual antes de criar outro.');
         return;
@@ -291,17 +290,6 @@ const NewJob = () => {
         } catch (upErr) {
           console.error('Falha ao subir fotos do pedido:', upErr);
         }
-      }
-
-      if (profId) {
-        // Orçamento direto: a proposta aceita + a 1ª mensagem são criadas no servidor.
-        const { data } = await attachProfessionalToRequestFn({
-          requestId: docRef.id,
-          professionalId: profId,
-          message: `Olá! Solicitei um orçamento direto pelo seu perfil para o serviço de ${subcategory || category}. A descrição é: "${description}". Aguardo seu retorno!`,
-        });
-        navigate(`/chats/${data.chatId}`);
-        return;
       }
 
       navigate('/request/success');

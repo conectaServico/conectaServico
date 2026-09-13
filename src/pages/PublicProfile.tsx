@@ -3,15 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { PublicProfile as PublicProfileType, Review } from '@/types';
-import { useUserStore } from '@/store/userStore';
-import { Loader2, Star, MapPin, Briefcase, User as UserIcon, ShieldCheck, ChevronLeft, MessageSquare } from 'lucide-react';
+import { Loader2, Star, MapPin, Briefcase, User as UserIcon, ShieldCheck, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const PublicProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUserStore();
   const [profile, setProfile] = useState<PublicProfileType | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,16 +81,6 @@ const PublicProfile = () => {
                     </span>
                   </div>
                 </div>
-
-                {user?.role === 'client' && user.id !== id && (
-                  <button
-                    onClick={() => navigate(`/request/new?profId=${id}`)}
-                    className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shadow-md shadow-primary/20"
-                  >
-                    <MessageSquare className="w-5 h-5" />
-                    Solicitar Orçamento
-                  </button>
-                )}
               </div>
             </div>
           </div>

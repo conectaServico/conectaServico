@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import {
   collection,
   query,
@@ -13,10 +13,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
-import Select from '@/components/Select';
-import { PublicProfile, ServiceRequest } from '@/types';
+import { ServiceRequest } from '@/types';
 import { queryTokens } from '@/utils/search';
-import { Search as SearchIcon, MapPin, Star, User as UserIcon, Filter, X, ShieldCheck, Briefcase } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { MAIN_CATEGORIES } from '@/utils/categories';
 
@@ -32,8 +31,6 @@ const Search = () => {
   const [results, setResults] = useState<any[]>([]);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [sortBy, setSortBy] = useState<'recent' | 'rating'>('recent');
-
   // Filtros
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -42,21 +39,18 @@ const Search = () => {
   const qTokens = queryTokens(q);
   const isTextSearch = qTokens.length > 0;
 
-  // Sem termo de busca: página por recência (com "carregar mais").
-  // Com termo: consulta `searchTokens` via array-contains-any (até 60), ranqueada no
-  // cliente por nº de tokens em comum. Estado/categoria continuam como filtro local.
+  // Busca de pedidos abertos pro profissional (alternativa por palavra-chave ao
+  // feed por raio do ProHome). Sem termo: página por recência ("carregar mais").
+  // Com termo: consulta `searchTokens` via array-contains-any (até 60), ranqueada
+  // no cliente por nº de tokens em comum. Estado/categoria ficam como filtro local.
   const fetchPage = useCallback(
     async (after: QueryDocumentSnapshot<DocumentData> | null) => {
       if (!user) return;
 
-      const isClient = user.role === 'client';
-      const col = isClient ? collection(db, 'publicProfiles') : collection(db, 'serviceRequests');
-      const baseWhere = isClient
-        ? where('role', '==', 'professional')
-        : where('status', '==', 'OPEN');
+      const col = collection(db, 'serviceRequests');
+      const baseWhere = where('status', '==', 'OPEN');
 
       const mapRow = (d: QueryDocumentSnapshot<DocumentData>) => {
-        if (isClient) return { id: d.id, ...d.data() } as PublicProfile & { _score?: number };
         const r = { id: d.id, ...d.data() } as ServiceRequest & { _score?: number };
         return { ...r, clientName: r.clientName || 'Cliente' };
       };
@@ -130,30 +124,26 @@ const Search = () => {
   // Filtros client-side: estado e categoria. O texto já foi resolvido no servidor
   // (searchTokens) quando há termo de busca.
   const filteredResults = results.filter(item => {
-    const isClient = user?.role === 'client';
-
     // estado (?city= carrega uma UF)
     if (cityParam && item.state && item.state !== cityParam) return false;
 
     // categoria (sidebar)
     if (selectedCategories.length === 0) return true;
-    if (isClient) {
-      const prof = item as PublicProfile;
-      if (!prof.services) return false;
-      return selectedCategories.some(cat =>
-        prof.services!.some(s => s.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(s.toLowerCase()))
-      );
-    }
     return selectedCategories.includes(item.category);
   });
 
   filteredResults.sort((a, b) => {
     if (isTextSearch) return (b._score || 0) - (a._score || 0) || (b.rating || 0) - (a.rating || 0);
-    if (sortBy === 'rating' && user?.role === 'client') return (b.rating || 0) - (a.rating || 0);
     return (b.created_at || 0) - (a.created_at || 0);
   });
 
   if (!user) return null;
+  // Cliente não navega/descobre profissionais fora do fluxo de pedido: o
+  // profissional só chega até o cliente pagando diamantes pra desbloquear um
+  // pedido. Deixar o cliente buscar e chamar um profissional direto zera essa
+  // fonte de receita. Esta tela agora é só pro profissional buscar pedidos
+  // abertos por palavra-chave (alternativa ao feed por raio do ProHome).
+  if (user.role === 'client') return <Navigate to="/home" replace />;
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-12 pt-8">
@@ -165,22 +155,10 @@ const Search = () => {
             {q ? `Resultados para "${q}"` : 'Todos os resultados'}
           </h1>
           <p className="text-slate-500 mt-2 flex items-center gap-1">
-            <MapPin className="w-4 h-4" /> 
-            {cityParam ? `Em ${cityParam}` : 'Em todo o Brasil'} 
+            <MapPin className="w-4 h-4" />
+            {cityParam ? `Em ${cityParam}` : 'Em todo o Brasil'}
           </p>
         </div>
-
-        <Select
-          value={sortBy}
-          onChange={(v) => setSortBy(v as 'recent' | 'rating')}
-          options={[
-            { value: 'recent', label: 'Mais Recentes' },
-            ...(user.role === 'client' ? [{ value: 'rating', label: 'Melhor Avaliação' }] : []),
-          ]}
-          className="w-full md:w-56"
-          buttonClassName="bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 shadow-sm"
-          ariaLabel="Ordenar resultados"
-        />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -269,101 +247,24 @@ const Search = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-5">
-              {user.role === 'client' 
-                ? filteredResults.map((prof: PublicProfile) => (
-                    <div key={prof.id} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:border-primary/50 group">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => navigate(`/user/${prof.id}`)}>
-                            {prof.photo_url ? (
-                              <img src={prof.photo_url} alt={prof.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <UserIcon className="w-8 h-8 text-slate-400" />
-                            )}
-                          </div>
-                          <div>
-                            <Link to={`/user/${prof.id}`} className="block group-hover:text-primary transition-colors">
-                              <h3 className="text-xl font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-                                {prof.name || 'Profissional'}
-                                {prof.verified && <ShieldCheck className="w-5 h-5 text-success" />}
-                              </h3>
-                            </Link>
-                            <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                              <span className="flex items-center gap-1 text-amber-500">
-                                <Star className="w-4 h-4 fill-current" />
-                                <strong className="text-sm">{prof.rating?.toFixed(1) || '5.0'}</strong>
-                                <span className="text-slate-400">({prof.reviewCount || 0} avaliações)</span>
-                              </span>
-                              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                              <span>Desde {prof.created_at ? new Date(prof.created_at).getFullYear() : '2024'}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-start md:items-end flex-shrink-0">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/request/new?profId=${prof.id}`);
-                            }}
-                            className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold hover:bg-primary-hover transition-colors shadow-sm shadow-primary/20 w-full md:w-auto text-center"
-                          >
-                            Solicitar Orçamento
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <p className="text-slate-600 mb-5 text-sm leading-relaxed line-clamp-3">
-                        {prof.bio || 'Profissional parceiro da Conecta Serviço.'}
-                      </p>
-                      
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        {prof.services && prof.services.slice(0, 6).map((s, i) => (
-                          <span key={i} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-full">
-                            {s}
-                          </span>
-                        ))}
-                        {prof.services && prof.services.length > 6 && (
-                          <span className="bg-slate-100 text-slate-500 text-[11px] font-bold px-3 py-1.5 rounded-full">
-                            +{prof.services.length - 6}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                            <Briefcase className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <span className="text-sm font-bold text-slate-700">Profissional</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-500 text-sm font-medium">
-                          <MapPin className="w-4 h-4" />
-                          <span>{prof.city}, {prof.state || 'Brasil'}</span>
-                        </div>
-                      </div>
+              {filteredResults.map((req: any) => (
+                <div key={req.id} onClick={() => navigate(`/requests/${req.id}`)} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:border-primary/50 group cursor-pointer">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-extrabold text-xl text-slate-900 group-hover:text-primary transition-colors mb-2 line-clamp-2">
+                      {req.subcategory || req.category} para {req.propertyType}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-grow">
+                    {req.description}
+                  </p>
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
+                    <div className="flex items-center text-slate-500 text-sm font-medium">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {req.city}, {req.state}
                     </div>
-                  ))
-                : filteredResults.map((req: any) => (
-                    // Fallback for professionals accessing this route directly
-                    <div key={req.id} onClick={() => navigate(`/requests/${req.id}`)} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all hover:border-primary/50 group cursor-pointer">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-extrabold text-xl text-slate-900 group-hover:text-primary transition-colors mb-2 line-clamp-2">
-                          {req.subcategory || req.category} para {req.propertyType}
-                        </h3>
-                      </div>
-                      <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-grow">
-                        {req.description}
-                      </p>
-                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
-                        <div className="flex items-center text-slate-500 text-sm font-medium">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          {req.city}, {req.state}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-              }
+                  </div>
+                </div>
+              ))}
 
               {hasMore && (
                 <button

@@ -1,5 +1,5 @@
 import { useUserStore } from '@/store/userStore';
-import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star, Search } from 'lucide-react';
+import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 
@@ -18,7 +18,6 @@ const clientBanners: Banner[] = [
     icon: ShieldCheck,
     title: 'Profissionais verificados',
     subtitle: 'Documento conferido e selo de confiança. Você escolhe com segurança.',
-    cta: { label: 'Buscar profissionais', to: '/search' },
   },
   {
     id: 'chat',
@@ -102,24 +101,18 @@ const ClientHome = () => {
         <BannerCarousel banners={clientBanners} />
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          <Link to="/request/new" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <PlusCircle className="w-5 h-5" />
+        <div className="grid grid-cols-2 gap-4">
+          <Link to="/request/new" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <PlusCircle className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Novo Pedido</span>
+            <span className="font-semibold text-slate-700 text-sm">Novo Pedido</span>
           </Link>
-          <Link to="/search" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <Search className="w-5 h-5" />
+          <Link to="/requests" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+              <ClipboardList className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Buscar Profissionais</span>
-          </Link>
-          <Link to="/requests" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <span className="font-semibold text-slate-700 text-xs text-center leading-tight">Meus Pedidos</span>
+            <span className="font-semibold text-slate-700 text-sm">Meus Pedidos</span>
           </Link>
         </div>
 
@@ -127,7 +120,6 @@ const ClientHome = () => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-slate-900">Categorias</h2>
-            <Link to="/search" className="text-primary text-sm font-semibold">Ver todas</Link>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {categories.map((cat, idx) => (

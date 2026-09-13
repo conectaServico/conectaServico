@@ -82,11 +82,6 @@ export const resolveSupportTicketFn = httpsCallable<
   { ok: boolean }
 >(functions, 'resolveSupportTicket');
 
-export const attachProfessionalToRequestFn = httpsCallable<
-  { requestId: string; professionalId: string; message?: string },
-  { ok: boolean; chatId: string }
->(functions, 'attachProfessionalToRequest');
-
 export const reviewValidationFn = httpsCallable<
   { userId: string; decision: 'approved' | 'rejected' },
   { ok: boolean }
