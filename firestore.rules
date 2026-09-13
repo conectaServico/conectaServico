@@ -245,6 +245,21 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ---------- errorLogs (monitoramento — erros do front-end pro painel admin) ----------
+    // Erros de servidor (Cloud Functions) já vão pro Cloud Logging automaticamente;
+    // isso aqui cobre só o que acontece no navegador do usuário. Escrita via SDK do
+    // cliente (por isso a regra); leitura só admin.
+    match /errorLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+        && incoming().userId == request.auth.uid
+        && incoming().source == 'client'
+        && incoming().message is string
+        && incoming().message.size() > 0
+        && incoming().message.size() <= 2000;
+      allow update, delete: if false;
+    }
+
     // ---------- validations (KYC) ----------
     // Escrita só via Function submitCpfValidation (impede CPF duplicado entre contas
     // — precisa de uma checagem atômica contra cpfIndex/* que as regras não fazem).

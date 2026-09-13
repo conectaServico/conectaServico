@@ -5,7 +5,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import * as crypto from 'crypto';
 import * as admin from 'firebase-admin';
-import { FieldValue, type DocumentData, type QuerySnapshot } from 'firebase-admin/firestore';
+import { FieldValue, AggregateField, type DocumentData, type QuerySnapshot } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 
 admin.initializeApp();
@@ -720,6 +720,70 @@ export const grantAdmin = onCall(wrapCallable(async (req) => {
   await admin.auth().setCustomUserClaims(target.uid, { admin: true });
   await db.doc(`users/${target.uid}`).set({ isAdmin: true }, { merge: true });
   return { ok: true };
+}));
+
+// ---------------------------------------------------------------------------
+// 8.1 Painel admin: métricas agregadas (clientes, profissionais, pedidos,
+// receita) — usa aggregate queries (count/sum) pra não baixar coleção inteira.
+// ---------------------------------------------------------------------------
+const REQUEST_STATUSES = ['OPEN', 'NEGOTIATING', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'EXPIRED'] as const;
+
+export const getAdminStats = onCall({ secrets: [MP_ACCESS_TOKEN] }, wrapCallable(async (req) => {
+  assertAdmin(req);
+
+  const usersCol = db.collection('users');
+  const requestsCol = db.collection('serviceRequests');
+  const approvedPayments = db.collection('payments').where('status', '==', 'approved');
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  const [
+    totalClientsSnap,
+    totalProsSnap,
+    verifiedProsSnap,
+    newClients7dSnap,
+    newPros7dSnap,
+    totalRequestsSnap,
+    requestStatusSnaps,
+    approvedPaymentsCountSnap,
+    revenueSnap,
+  ] = await Promise.all([
+    usersCol.where('role', '==', 'client').count().get(),
+    usersCol.where('role', '==', 'professional').count().get(),
+    usersCol.where('role', '==', 'professional').where('verified', '==', true).count().get(),
+    usersCol.where('role', '==', 'client').where('created_at', '>=', sevenDaysAgo).count().get(),
+    usersCol.where('role', '==', 'professional').where('created_at', '>=', sevenDaysAgo).count().get(),
+    requestsCol.count().get(),
+    Promise.all(REQUEST_STATUSES.map((s) => requestsCol.where('status', '==', s).count().get())),
+    approvedPayments.count().get(),
+    approvedPayments.aggregate({
+      totalBRL: AggregateField.sum('amount'),
+      totalDiamonds: AggregateField.sum('diamonds'),
+    }).get(),
+  ]);
+
+  const requestsByStatus: Record<string, number> = {};
+  REQUEST_STATUSES.forEach((s, i) => {
+    requestsByStatus[s] = requestStatusSnaps[i].data().count;
+  });
+
+  const mpToken = MP_ACCESS_TOKEN.value();
+  const mpMode = !mpToken ? 'unset' : mpToken.startsWith('TEST-') ? 'test' : 'live';
+
+  return {
+    totalClients: totalClientsSnap.data().count,
+    totalProfessionals: totalProsSnap.data().count,
+    verifiedProfessionals: verifiedProsSnap.data().count,
+    newClientsLast7Days: newClients7dSnap.data().count,
+    newProfessionalsLast7Days: newPros7dSnap.data().count,
+    totalRequests: totalRequestsSnap.data().count,
+    requestsByStatus,
+    revenue: {
+      totalBRL: revenueSnap.data().totalBRL || 0,
+      totalDiamondsSold: revenueSnap.data().totalDiamonds || 0,
+      approvedPayments: approvedPaymentsCountSnap.data().count,
+    },
+    mpMode,
+  };
 }));
 
 // ---------------------------------------------------------------------------

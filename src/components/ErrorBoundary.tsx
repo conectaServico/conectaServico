@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { logClientError } from '@/utils/errorLog';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -24,8 +25,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Console for now; forward to Sentry / Crashlytics once configured.
     console.error('[ErrorBoundary]', error, info.componentStack);
+    logClientError(error.message, { stack: error.stack || info.componentStack || undefined, source: 'ErrorBoundary' });
   }
 
   private handleReload = (): void => {

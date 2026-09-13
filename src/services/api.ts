@@ -105,6 +105,23 @@ export const bootstrapAdminFn = httpsCallable<{ secret: string }, { ok: boolean;
 
 export const grantAdminFn = httpsCallable<{ email: string }, { ok: boolean }>(functions, 'grantAdmin');
 
+export interface AdminStats {
+  totalClients: number;
+  totalProfessionals: number;
+  verifiedProfessionals: number;
+  newClientsLast7Days: number;
+  newProfessionalsLast7Days: number;
+  totalRequests: number;
+  requestsByStatus: Record<string, number>;
+  revenue: {
+    totalBRL: number;
+    totalDiamondsSold: number;
+    approvedPayments: number;
+  };
+  mpMode: 'test' | 'live' | 'unset';
+}
+export const getAdminStatsFn = httpsCallable<Record<string, never>, AdminStats>(functions, 'getAdminStats');
+
 /** Exclui a própria conta (LGPD). Apaga perfil, KYC, arquivos e anúncios; encerra o login. */
 export const deleteMyAccountFn = httpsCallable<Record<string, never>, { ok: boolean }>(
   functions,
