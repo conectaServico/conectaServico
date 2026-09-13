@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { RecaptchaVerifier, PhoneAuthProvider } from 'firebase/auth';
@@ -14,9 +14,14 @@ import { ServiceRequest, Urgency, MaterialOption } from '@/types';
 import { maskCEP, maskPhone } from '@/utils/masks';
 import OtpInput from '@/components/OtpInput';
 
-import { CATEGORIES_MAP, MAIN_CATEGORIES, serviceTypeOptions, WEEKDAYS, DAY_PERIODS } from '@/utils/categories';
+import { CATEGORIES_MAP, MAIN_CATEGORIES, serviceTypeOptions, descriptionPlaceholder, WEEKDAYS, DAY_PERIODS } from '@/utils/categories';
 
 const PROPERTY_TYPES = ['Casa', 'Apartamento', 'Comercial', 'Condomínio'];
+
+// Cada tela do Passo 1 mostra UMA pergunta por vez (igual ao fluxo do GetNinjas):
+// o cliente escolhe a opção e só então avança, em vez de rolar um formulário
+// inteiro com tudo junto.
+type Step1Screen = 'category' | 'subcategory' | 'serviceType' | 'areaSize' | 'blueprint' | 'propertyType' | 'availableDays' | 'availablePeriods' | 'urgency';
 
 const NewJob = () => {
   const { user, setUser } = useUserStore();
@@ -25,8 +30,9 @@ const NewJob = () => {
   const [searchParams] = useSearchParams();
   const defaultCategory = searchParams.get('category');
   const defaultSubcategory = searchParams.get('subcategory');
-  
+
   const [step, setStep] = useState(1);
+  const [microIndex, setMicroIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,10 +47,10 @@ const NewJob = () => {
     }
   }, [defaultCategory]);
 
-  // Ao trocar de etapa, volta o scroll para o topo do formulário.
+  // Ao trocar de etapa/pergunta, volta o scroll para o topo do formulário.
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [step]);
+  }, [step, microIndex]);
   const [propertyType, setPropertyType] = useState('');
   const [urgency, setUrgency] = useState<Urgency>('Média (Próximas semanas)');
   const [areaSize, setAreaSize] = useState('');
@@ -200,43 +206,96 @@ const NewJob = () => {
   // perguntam quando o cliente pode receber o profissional.
   const needsAvailability = ['Serviços gerais', 'Limpeza e manutenção'].includes(category);
 
-  const nextStep = () => {
+  // Lista ordenada das telas do Passo 1, uma pergunta por tela — GetNinjas mostra
+  // exatamente uma decisão por página em vez de um formulário longo.
+  const step1Screens = useMemo<Step1Screen[]>(() => {
+    const screens: Step1Screen[] = [];
+    if (!defaultCategory) screens.push('category');
+    screens.push('subcategory');
+    screens.push('serviceType');
+    if (needsAreaSize) screens.push('areaSize');
+    if (needsBlueprint) screens.push('blueprint');
+    if (needsPropertyType) screens.push('propertyType');
+    if (needsAvailability) screens.push('availableDays');
+    if (needsAvailability) screens.push('availablePeriods');
+    screens.push('urgency');
+    return screens;
+  }, [defaultCategory, needsAreaSize, needsBlueprint, needsPropertyType, needsAvailability]);
+
+  const currentScreen = step1Screens[Math.min(microIndex, step1Screens.length - 1)];
+
+  const handleNextMicro = () => {
+    setError('');
+    if (currentScreen === 'category' && !category) {
+      setError('Por favor, selecione a categoria do serviço.');
+      return;
+    }
+    if (currentScreen === 'subcategory' && !subcategory) {
+      setError('Por favor, selecione o serviço específico.');
+      return;
+    }
+    if (currentScreen === 'serviceType' && !serviceType) {
+      setError('Por favor, selecione o tipo de serviço.');
+      return;
+    }
+    if (currentScreen === 'areaSize' && (!areaSize || Number(areaSize) <= 0)) {
+      setError('Por favor, informe uma estimativa válida do tamanho do espaço (m²).');
+      return;
+    }
+    if (currentScreen === 'blueprint' && hasBlueprint === null) {
+      setError('Por favor, informe se você possui a planta do projeto.');
+      return;
+    }
+    if (currentScreen === 'propertyType' && !propertyType) {
+      setError('Por favor, selecione o tipo de imóvel.');
+      return;
+    }
+    if (currentScreen === 'availableDays' && availableDays.length === 0) {
+      setError('Por favor, selecione ao menos um dia disponível.');
+      return;
+    }
+    if (currentScreen === 'availablePeriods' && availablePeriods.length === 0) {
+      setError('Por favor, selecione ao menos um período disponível.');
+      return;
+    }
+
+    if (microIndex + 1 < step1Screens.length) {
+      setMicroIndex((i) => i + 1);
+    } else {
+      setStep(2);
+    }
+  };
+
+  const handleNext = () => {
     setError('');
     if (step === 1) {
-      if (!subcategory) {
-        setError('Por favor, selecione o serviço específico.');
-        return;
-      }
-      if (!serviceType) {
-        setError('Por favor, selecione o tipo de serviço.');
-        return;
-      }
-      if (needsAreaSize && (!areaSize || Number(areaSize) <= 0)) {
-        setError('Por favor, informe uma estimativa válida do tamanho do espaço (m²).');
-        return;
-      }
-      if (needsBlueprint && hasBlueprint === null) {
-        setError('Por favor, informe se você possui a planta do projeto.');
-        return;
-      }
-      if (needsPropertyType && !propertyType) {
-        setError('Por favor, selecione o tipo de imóvel.');
-        return;
-      }
-      if (needsAvailability && (availableDays.length === 0 || availablePeriods.length === 0)) {
-        setError('Por favor, informe quando você pode receber o profissional.');
-        return;
-      }
+      handleNextMicro();
+      return;
     }
     if (step === 2 && description.length < 20) {
       setError('A descrição deve ter pelo menos 20 caracteres.');
       return;
     }
-    if (step === 3 && (!city || !neighborhood || !street || !number)) {
-      setError('Preencha todos os dados obrigatórios do local.');
+    if (step === 2) {
+      setStep(3);
       return;
     }
-    setStep(s => s + 1);
+  };
+
+  const handleBack = () => {
+    setError('');
+    if (step === 1) {
+      if (microIndex > 0) setMicroIndex((i) => i - 1);
+      return;
+    }
+    if (step === 2) {
+      setStep(1);
+      setMicroIndex(step1Screens.length - 1);
+      return;
+    }
+    if (step === 3) {
+      setStep(2);
+    }
   };
 
   const handleSubmit = async () => {
@@ -328,6 +387,15 @@ const NewJob = () => {
     }
   };
 
+  const showBack = step > 1 || (step === 1 && microIndex > 0);
+  // Barra de progresso geral: 3 macro-etapas (Serviço / Detalhes / Local), com o
+  // avanço dentro do Passo 1 proporcional a cada pergunta respondida.
+  const overallPercent = step === 1
+    ? ((microIndex + 1) / step1Screens.length) * (100 / 3)
+    : step === 2
+      ? 100 / 3 + 100 / 6
+      : 100;
+
   return (
     <div className="max-w-2xl mx-auto pb-8">
       <div className="mb-8">
@@ -339,12 +407,12 @@ const NewJob = () => {
           <ChevronRight className="w-4 h-4" />
           <span className={step >= 3 ? 'text-primary' : ''}>Local e Confirmação</span>
         </div>
-        
+
         {/* Progress bar */}
         <div className="w-full bg-slate-200 h-2 rounded-full mt-4 overflow-hidden">
-          <div 
-            className="bg-primary h-full transition-all duration-500 ease-in-out" 
-            style={{ width: `${(step / 3) * 100}%` }}
+          <div
+            className="bg-primary h-full transition-all duration-500 ease-in-out"
+            style={{ width: `${overallPercent}%` }}
           />
         </div>
       </div>
@@ -357,23 +425,25 @@ const NewJob = () => {
           </div>
         )}
 
-        {/* STEP 1 */}
+        {/* STEP 1 — uma pergunta por página */}
         {step === 1 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-            
-            {/* Se não tem categoria pré-selecionada, mostra a lista de categorias principais */}
-            {!category && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-base font-bold text-slate-800 mb-3">Qual a categoria do serviço?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 -mr-1">
+          <div key={microIndex} className="animate-in fade-in slide-in-from-right-4 duration-300">
+            <p className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wide">
+              Pergunta {microIndex + 1} de {step1Screens.length}
+            </p>
+
+            {currentScreen === 'category' && (
+              <div>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Qual a categoria do serviço?</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {MAIN_CATEGORIES.map(cat => (
                     <button
                       key={cat}
                       type="button"
                       onClick={() => setCategory(cat)}
                       className={`p-4 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer text-left ${
-                        category === cat 
-                          ? 'border-primary bg-primary/5 text-primary' 
+                        category === cat
+                          ? 'border-primary bg-primary/5 text-primary'
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                       }`}
                     >
@@ -384,33 +454,35 @@ const NewJob = () => {
               </div>
             )}
 
-            {category && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-base font-bold text-slate-800">
+            {currentScreen === 'subcategory' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <label className="block text-xl font-bold text-slate-800">
                     {!defaultCategory ? `Qual serviço de ${category} você precisa?` : 'Qual serviço você precisa?'}
                   </label>
                   {!defaultCategory && (
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => {
                         setCategory('');
                         setSubcategory('');
+                        setMicroIndex(0);
                       }}
-                      className="text-xs font-bold text-primary hover:underline"
+                      className="text-xs font-bold text-primary hover:underline whitespace-nowrap ml-2"
                     >
                       Trocar categoria
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1 -mr-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[28rem] overflow-y-auto pr-1 -mr-1">
                   {CATEGORIES_MAP[category]?.map(sub => (
                     <button
                       key={sub}
                       type="button"
                       onClick={() => setSubcategory(sub)}
                       className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer flex items-center justify-center text-center min-h-[64px] ${
-                        subcategory === sub 
-                          ? 'border-primary bg-primary text-white shadow-md scale-[1.02]' 
+                        subcategory === sub
+                          ? 'border-primary bg-primary text-white shadow-md scale-[1.02]'
                           : 'border-slate-200 bg-white text-slate-600 hover:border-primary/50 hover:bg-slate-50'
                       }`}
                     >
@@ -421,9 +493,9 @@ const NewJob = () => {
               </div>
             )}
 
-            {subcategory && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-base font-bold text-slate-800 mb-3">Qual tipo de serviço você procura?</label>
+            {currentScreen === 'serviceType' && (
+              <div>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Qual tipo de serviço você procura?</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {serviceTypeOptions(subcategory).map(opt => (
                     <button
@@ -443,13 +515,14 @@ const NewJob = () => {
               </div>
             )}
 
-            {needsAreaSize && (
+            {currentScreen === 'areaSize' && (
               <div>
-                <label className="block text-base font-bold text-slate-800 mb-3">Tamanho do espaço (m²)</label>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Qual o tamanho do espaço?</label>
                 <div className="relative">
                   <input
                     type="number"
                     min="1"
+                    autoFocus
                     className="w-full p-3.5 pr-12 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     placeholder="Ex: 50"
                     value={areaSize}
@@ -457,28 +530,28 @@ const NewJob = () => {
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold bg-slate-50 pl-2 pointer-events-none">m²</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-2">Estimativa do tamanho do local ou da área do serviço.</p>
+                <p className="text-xs text-slate-500 mt-2">Estimativa do tamanho do local ou da área do serviço, em metros quadrados (m²).</p>
               </div>
             )}
 
-            {needsBlueprint && (
+            {currentScreen === 'blueprint' && (
               <div>
-                <label className="block text-base font-bold text-slate-800 mb-2">Você possui a planta do projeto?</label>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Você possui a planta do projeto?</label>
                 <div className="flex gap-4">
-                  <label className={`flex-1 flex items-center justify-center p-3 border-2 rounded-xl cursor-pointer transition-all ${hasBlueprint === true ? 'border-primary bg-primary/5 text-primary font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                    <input 
-                      type="radio" 
-                      name="blueprint" 
+                  <label className={`flex-1 flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${hasBlueprint === true ? 'border-primary bg-primary/5 text-primary font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    <input
+                      type="radio"
+                      name="blueprint"
                       className="hidden"
                       checked={hasBlueprint === true}
                       onChange={() => setHasBlueprint(true)}
                     />
                     Sim
                   </label>
-                  <label className={`flex-1 flex items-center justify-center p-3 border-2 rounded-xl cursor-pointer transition-all ${hasBlueprint === false ? 'border-primary bg-primary/5 text-primary font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                    <input 
-                      type="radio" 
-                      name="blueprint" 
+                  <label className={`flex-1 flex items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all ${hasBlueprint === false ? 'border-primary bg-primary/5 text-primary font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    <input
+                      type="radio"
+                      name="blueprint"
                       className="hidden"
                       checked={hasBlueprint === false}
                       onChange={() => setHasBlueprint(false)}
@@ -489,16 +562,16 @@ const NewJob = () => {
               </div>
             )}
 
-            {needsPropertyType && (
+            {currentScreen === 'propertyType' && (
               <div>
-                <label className="block text-base font-bold text-slate-800 mb-2">Qual o tipo de imóvel?</label>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Qual o tipo de imóvel?</label>
                 <div className="grid grid-cols-2 gap-3">
                   {PROPERTY_TYPES.map(type => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setPropertyType(type)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer ${
+                      className={`p-4 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer ${
                         propertyType === type ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'
                       }`}
                     >
@@ -509,62 +582,67 @@ const NewJob = () => {
               </div>
             )}
 
-            {needsAvailability && (
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-base font-bold text-slate-800 mb-3">Quando você pode receber o profissional?</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {WEEKDAYS.map(day => (
-                      <label key={day} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availableDays.includes(day) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={availableDays.includes(day)}
-                          onChange={() => toggleInList(availableDays, setAvailableDays, day)}
-                        />
-                        {day}
-                      </label>
-                    ))}
-                  </div>
+            {currentScreen === 'availableDays' && (
+              <div>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Quando você pode receber o profissional?</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {WEEKDAYS.map(day => (
+                    <label key={day} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availableDays.includes(day) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={availableDays.includes(day)}
+                        onChange={() => toggleInList(availableDays, setAvailableDays, day)}
+                      />
+                      {day}
+                    </label>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-base font-bold text-slate-800 mb-3">Marque os horários que você pode receber o profissional</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {DAY_PERIODS.map(period => (
-                      <label key={period} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availablePeriods.includes(period) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                        <input
-                          type="checkbox"
-                          className="hidden"
-                          checked={availablePeriods.includes(period)}
-                          onChange={() => toggleInList(availablePeriods, setAvailablePeriods, period)}
-                        />
-                        {period}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500 mt-3">Selecione um ou mais dias.</p>
               </div>
             )}
 
-            <div>
-              <label className="block text-base font-bold text-slate-800 mb-3">Qual a urgência?</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {(['Baixa (Pode esperar)', 'Média (Próximas semanas)', 'Alta (O quanto antes)', 'Emergência (Imediato)'] as const).map(opt => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setUrgency(opt as Urgency)}
-                    className={`p-3.5 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer text-left ${
-                      urgency === opt 
-                        ? 'border-primary bg-primary/5 text-primary' 
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
+            {currentScreen === 'availablePeriods' && (
+              <div>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Marque os horários que você pode receber o profissional</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {DAY_PERIODS.map(period => (
+                    <label key={period} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availablePeriods.includes(period) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={availablePeriods.includes(period)}
+                        onChange={() => toggleInList(availablePeriods, setAvailablePeriods, period)}
+                      />
+                      {period}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-3">Selecione um ou mais períodos.</p>
               </div>
-            </div>
+            )}
+
+            {currentScreen === 'urgency' && (
+              <div>
+                <label className="block text-xl font-bold text-slate-800 mb-4">Qual a urgência?</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(['Baixa (Pode esperar)', 'Média (Próximas semanas)', 'Alta (O quanto antes)', 'Emergência (Imediato)'] as const).map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setUrgency(opt as Urgency)}
+                      className={`p-3.5 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer text-left ${
+                        urgency === opt
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -577,7 +655,7 @@ const NewJob = () => {
               <textarea
                 rows={6}
                 className="w-full p-4 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                placeholder="Ex: Preciso pintar 3 cômodos do apartamento (sala e 2 quartos). As paredes não têm infiltração, mas precisam de massa corrida em alguns pontos..."
+                placeholder={descriptionPlaceholder(category)}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -858,24 +936,24 @@ const NewJob = () => {
 
         {/* Footer Buttons */}
         <div className="flex gap-4 pt-8 mt-8 border-t border-slate-100">
-          {step > 1 && (
+          {showBack && (
             <button
               type="button"
-              onClick={() => setStep(s => s - 1)}
+              onClick={handleBack}
               className="px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center justify-center"
               disabled={loading}
             >
               Voltar
             </button>
           )}
-          
+
           {step < 3 ? (
             <button
               type="button"
-              onClick={nextStep}
+              onClick={handleNext}
               className="flex-1 bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all flex items-center justify-center shadow-md shadow-primary/20"
             >
-              Próximo Passo
+              Avançar
             </button>
           ) : (
             <button

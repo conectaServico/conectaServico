@@ -11,7 +11,7 @@ export const CATEGORY_MENUS = [
     slug: 'assistencia-tecnica',
     icon: Wrench,
     items: ['Aquecedor a gás', 'Ar condicionado', 'Geladeira e freezer', 'Máquina de lavar', 'Técnico de celular', 'Técnico de informática'],
-    image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=800&q=80'
+    image: 'https://images.unsplash.com/photo-1721333089073-215a56fd710c?auto=format&fit=crop&w=800&q=80'
   },
   {
     name: 'Design e Tecnologia',
@@ -56,39 +56,39 @@ export const MAIN_CATEGORIES = Object.keys(CATEGORIES_MAP);
  * (CATEGORY_MENUS[i].image) — assim todo item sempre tem alguma foto.
  */
 export const SERVICE_IMAGES: Record<string, string> = {
-  'Aquecedor a gás': 'https://images.unsplash.com/photo-1567789884554-0b844b597180?auto=format&fit=crop&w=400&q=70',
-  'Ar condicionado': 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=400&q=70',
+  'Aquecedor a gás': 'https://images.unsplash.com/photo-1594233078955-e1f73a02ebb2?auto=format&fit=crop&w=400&q=70',
+  'Ar condicionado': 'https://images.unsplash.com/photo-1757219525975-03b5984bc6e8?auto=format&fit=crop&w=400&q=70',
   'Geladeira e freezer': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=400&q=70',
-  'Máquina de lavar': 'https://images.unsplash.com/photo-1489274495757-95c7c837b101?auto=format&fit=crop&w=400&q=70',
-  'Técnico de celular': 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?auto=format&fit=crop&w=400&q=70',
+  'Máquina de lavar': 'https://images.unsplash.com/photo-1622473590925-e3616c0a41bf?auto=format&fit=crop&w=400&q=70',
+  'Técnico de celular': 'https://images.unsplash.com/photo-1550041473-d296a3a8a18a?auto=format&fit=crop&w=400&q=70',
   'Técnico de informática': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=70',
   'Desenvolvedor de sites': 'https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=400&q=70',
   'Designer gráfico': 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=400&q=70',
   'Marketing digital': 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?auto=format&fit=crop&w=400&q=70',
   'Edição de vídeo': 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=400&q=70',
   'Pedreiro': 'https://images.unsplash.com/photo-1653280679689-078c04c417a1?auto=format&fit=crop&w=400&q=70',
-  'Azulejista': 'https://images.unsplash.com/photo-1618221469555-7f3ad97540d6?auto=format&fit=crop&w=400&q=70',
+  'Azulejista': 'https://images.unsplash.com/photo-1523413307857-ef24c53571ae?auto=format&fit=crop&w=400&q=70',
   'Pintor': 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=400&q=70',
-  'Gesseiro': 'https://images.unsplash.com/photo-1761986757577-140af8859587?auto=format&fit=crop&w=400&q=70',
-  'Drywall': 'https://images.unsplash.com/photo-1622021142947-da7dedc7c39a?auto=format&fit=crop&w=400&q=70',
+  'Gesseiro': 'https://images.unsplash.com/photo-1768839725085-829e6ac7ac26?auto=format&fit=crop&w=400&q=70',
+  'Drywall': 'https://images.unsplash.com/photo-1768321903410-54961e343b71?auto=format&fit=crop&w=400&q=70',
   'Encanador': 'https://images.unsplash.com/photo-1673870861507-d72aa6855d89?auto=format&fit=crop&w=400&q=70',
   'Eletricista': 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=400&q=70',
   'Serralheiro': 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&w=400&q=70',
   'Marceneiro': 'https://images.unsplash.com/photo-1611486212557-88be5ff6f941?auto=format&fit=crop&w=400&q=70',
-  'Soldador': 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=400&q=70',
-  'Montador de móveis': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=70',
-  'Vidraceiro': 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=400&q=70',
-  'Telhadista': 'https://images.unsplash.com/photo-1590274853856-f22d5ee3d228?auto=format&fit=crop&w=400&q=70',
+  'Soldador': 'https://images.unsplash.com/photo-1745448797901-2a4c9d9af1c1?auto=format&fit=crop&w=400&q=70',
+  'Montador de móveis': 'https://images.unsplash.com/photo-1590635023142-73c3d34f2805?auto=format&fit=crop&w=400&q=70',
+  'Vidraceiro': 'https://images.unsplash.com/photo-1524803504179-6d7ae4d283f7?auto=format&fit=crop&w=400&q=70',
+  'Telhadista': 'https://images.unsplash.com/photo-1763665814538-8ba04597286c?auto=format&fit=crop&w=400&q=70',
   'Impermeabilização': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=70',
   'Diarista': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=70',
   'Babá': 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=400&q=70',
   'Cozinheira': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=400&q=70',
-  'Limpeza pós-obra': 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?auto=format&fit=crop&w=400&q=70',
+  'Limpeza pós-obra': 'https://images.unsplash.com/photo-1718152421680-d1580e843cc9?auto=format&fit=crop&w=400&q=70',
   'Jardinagem': 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=400&q=70',
-  'Piscineiro': 'https://images.unsplash.com/photo-1560184611-ff3e53f00e8f?auto=format&fit=crop&w=400&q=70',
-  'Dedetização': 'https://images.unsplash.com/photo-1604187351574-c75ca79f5807?auto=format&fit=crop&w=400&q=70',
+  'Piscineiro': 'https://images.unsplash.com/photo-1745570295714-cb18cd15ff64?auto=format&fit=crop&w=400&q=70',
+  'Dedetização': 'https://images.unsplash.com/photo-1611773236409-f3ee161007a1?auto=format&fit=crop&w=400&q=70',
   'Lavagem de sofá': 'https://images.unsplash.com/photo-1567016432779-094069958ea5?auto=format&fit=crop&w=400&q=70',
-  'Limpeza de caixa d’água': 'https://images.unsplash.com/photo-1584622781564-1d987f7333c1?auto=format&fit=crop&w=400&q=70',
+  'Limpeza de caixa d’água': 'https://images.unsplash.com/photo-1778178933409-705e5a5c6a48?auto=format&fit=crop&w=400&q=70',
   'Marido de aluguel': 'https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=400&q=70',
   'Fretes e mudanças': 'https://images.unsplash.com/photo-1600518464441-9154a4dea21b?auto=format&fit=crop&w=400&q=70',
   'Instalador de câmeras': 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=400&q=70',
@@ -146,3 +146,21 @@ export function serviceTypeOptions(subcategory: string): string[] {
 
 export const WEEKDAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
 export const DAY_PERIODS = ['Manhã (7h às 12h)', 'Tarde (12h às 18h)', 'Noite (após 18h)'];
+
+/**
+ * Exemplo (placeholder) do campo de descrição, por categoria — cada categoria
+ * tem seu próprio exemplo em vez de sempre mostrar um exemplo de obras/pintura
+ * pra quem está pedindo, digamos, uma diarista ou um site.
+ */
+const DESCRIPTION_PLACEHOLDERS: Record<string, string> = {
+  'Construção e reformas': 'Ex: Preciso pintar 3 cômodos do apartamento (sala e 2 quartos). As paredes não têm infiltração, mas precisam de massa corrida em alguns pontos...',
+  'Assistência técnica': 'Ex: Meu ar condicionado não está gelando e faz um ruído estranho ao ligar. Preciso de uma avaliação e do conserto o quanto antes...',
+  'Design e Tecnologia': 'Ex: Preciso de um site institucional com 5 páginas pra minha empresa, com formulário de contato e integração com WhatsApp...',
+  'Limpeza e manutenção': 'Ex: Preciso de uma diarista quinzenal pra limpeza geral de um apartamento de 2 quartos, incluindo cozinha e banheiros...',
+  'Serviços gerais': 'Ex: Preciso instalar 2 prateleiras e trocar uma fechadura. Já tenho os materiais, só preciso da mão de obra...',
+};
+const DEFAULT_DESCRIPTION_PLACEHOLDER = 'Ex: Descreva o que precisa, com detalhes como medidas, prazos e preferências que ajudem o profissional a entender o serviço...';
+
+export function descriptionPlaceholder(category: string): string {
+  return DESCRIPTION_PLACEHOLDERS[category] || DEFAULT_DESCRIPTION_PLACEHOLDER;
+}
