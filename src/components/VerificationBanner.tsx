@@ -14,7 +14,12 @@ const VerificationBanner = () => {
   const location = useLocation();
 
   if (!isAuthenticated || verified) return null;
-  if (location.pathname === '/verify' || location.pathname === '/login' || location.pathname === '/register') {
+  if (
+    location.pathname === '/verify' ||
+    location.pathname === '/login' ||
+    location.pathname === '/register' ||
+    location.pathname.startsWith('/categoria/')
+  ) {
     return null;
   }
 

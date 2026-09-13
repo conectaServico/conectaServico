@@ -3,10 +3,26 @@ import {
   Smartphone,
   Hammer,
   Droplets,
-  Users
+  Users,
+  type LucideIcon
 } from 'lucide-react';
 
-export const CATEGORY_MENUS = [
+export interface CategoryGroup {
+  label: string;
+  items: string[];
+}
+
+export interface CategoryMenu {
+  name: string;
+  slug: string;
+  icon: LucideIcon;
+  items: string[];
+  image: string;
+  /** Abas opcionais (ex.: Para Casa / Para Família / Para Pets) — categorias sem isso mostram a lista corrida de `items`. */
+  groups?: CategoryGroup[];
+}
+
+export const CATEGORY_MENUS: CategoryMenu[] = [
   {
     name: 'Serviços gerais',
     slug: 'servicos-gerais',
@@ -39,7 +55,15 @@ export const CATEGORY_MENUS = [
     name: 'Serviços domésticos',
     slug: 'servicos-domesticos',
     icon: Users,
-    items: ['Babá', 'Cozinheira', 'Diarista'],
+    // Agrupado em abas (Para Casa / Para Família / Para Pets) igual ao app do
+    // GetNinjas — `items` é a união usada nos lugares que não têm abas (fileira
+    // da home, grade de subcategoria do "novo pedido").
+    groups: [
+      { label: 'Para Casa', items: ['Diarista', 'Limpeza de Piscina', 'Passadeira', 'Personal Shopper', 'Lavadeira'] },
+      { label: 'Para Família', items: ['Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular'] },
+      { label: 'Para Pets', items: ['Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'] },
+    ],
+    items: ['Diarista', 'Limpeza de Piscina', 'Passadeira', 'Personal Shopper', 'Lavadeira', 'Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular', 'Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'],
     image: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=800&q=80'
   },
   {
@@ -102,6 +126,17 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Instalador de câmeras': 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=400&q=70',
   'Segurança e alarmes': 'https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&q=70',
   'Aulas particulares': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=400&q=70',
+  'Limpeza de Piscina': 'https://images.unsplash.com/photo-1745570295714-cb18cd15ff64?auto=format&fit=crop&w=400&q=70',
+  'Passadeira': 'https://images.unsplash.com/photo-1647202152259-98fe50ad0618?auto=format&fit=crop&w=400&q=70',
+  'Personal Shopper': 'https://images.unsplash.com/photo-1760565030786-91526dff426c?auto=format&fit=crop&w=400&q=70',
+  'Lavadeira': 'https://images.unsplash.com/photo-1577553697116-6ee9a4ba564b?auto=format&fit=crop&w=400&q=70',
+  'Motorista': 'https://images.unsplash.com/photo-1761599933861-fddf8f791c0a?auto=format&fit=crop&w=400&q=70',
+  'Personal Organizer': 'https://images.unsplash.com/photo-1650229068182-6931ccb389c2?auto=format&fit=crop&w=400&q=70',
+  'Entregador': 'https://images.unsplash.com/photo-1543499459-d1460946bdc6?auto=format&fit=crop&w=400&q=70',
+  'Segurança Particular': 'https://images.unsplash.com/photo-1618371690240-e0d46eead4b8?auto=format&fit=crop&w=400&q=70',
+  'Adestrador de Cães': 'https://images.unsplash.com/photo-1484190929067-65e7edd5a22f?auto=format&fit=crop&w=400&q=70',
+  'Passeador de Cães': 'https://images.unsplash.com/photo-1729890838717-c508668a5ba0?auto=format&fit=crop&w=400&q=70',
+  'Serviços para Pets': 'https://images.unsplash.com/photo-1719464454959-9cf304ef4774?auto=format&fit=crop&w=400&q=70',
 };
 
 /** Foto pra um serviço, com fallback pra imagem da categoria dona dele. */
@@ -137,14 +172,28 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   'Eletricista': ['Instalação', 'Conserto ou manutenção', 'Fiação elétrica', 'Instalação de ar condicionado', 'Instalação de ventilador de teto', 'Certificado de instalação', 'Outro'],
   'Montador de móveis': ['Móveis planejados', 'Móveis de loja (MDF)', 'Desmontagem', 'Outro'],
   // Limpeza e manutenção
-  'Diarista': ['Limpeza única', 'Semanal', 'Quinzenal', 'Mensal'],
-  'Babá': ['Eventual', 'Fixo (diário)', 'Período integral', 'Meio período'],
-  'Cozinheira': ['Evento único', 'Refeições da semana', 'Fixo (diário)'],
   'Jardinagem': ['Manutenção regular', 'Poda', 'Paisagismo', 'Outro'],
   'Piscineiro': ['Limpeza/manutenção', 'Tratamento químico', 'Reparo', 'Outro'],
   // Serviços gerais
   'Marido de aluguel': ['Pequenos reparos', 'Instalação', 'Montagem', 'Manutenção geral', 'Outro'],
   'Fretes e mudanças': ['Mudança residencial', 'Frete de item único', 'Mudança comercial', 'Outro'],
+  // Serviços domésticos — Para Casa
+  'Diarista': ['Limpeza única', 'Semanal', 'Quinzenal', 'Mensal'],
+  'Limpeza de Piscina': ['Limpeza/manutenção', 'Tratamento químico', 'Reparo', 'Outro'],
+  'Passadeira': ['Eventual', 'Semanal', 'Quinzenal', 'Mensal'],
+  'Personal Shopper': ['Compras do dia a dia', 'Compras especiais/presentes', 'Consultoria de estilo', 'Outro'],
+  'Lavadeira': ['Eventual', 'Semanal', 'Quinzenal', 'Mensal'],
+  // Serviços domésticos — Para Família
+  'Babá': ['Eventual', 'Fixo (diário)', 'Período integral', 'Meio período'],
+  'Cozinheira': ['Evento único', 'Refeições da semana', 'Fixo (diário)'],
+  'Motorista': ['Corrida avulsa', 'Fixo (diário)', 'Viagens', 'Outro'],
+  'Personal Organizer': ['Organização de um ambiente', 'Casa completa', 'Mudança/desapego', 'Outro'],
+  'Entregador': ['Entrega única', 'Entregas recorrentes', 'Outro'],
+  'Segurança Particular': ['Evento único', 'Diária/plantão', 'Fixo (mensal)', 'Outro'],
+  // Serviços domésticos — Para Pets
+  'Adestrador de Cães': ['Adestramento básico', 'Comportamental', 'Filhotes', 'Outro'],
+  'Passeador de Cães': ['Eventual', 'Diário', 'Semanal', 'Outro'],
+  'Serviços para Pets': ['Banho e tosa', 'Hospedagem/hotel', 'Pet sitter', 'Outro'],
 };
 const DEFAULT_SERVICE_TYPES = ['Instalação', 'Conserto ou manutenção', 'Outro'];
 

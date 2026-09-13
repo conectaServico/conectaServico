@@ -1,25 +1,21 @@
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CATEGORY_MENUS } from '@/utils/categories';
-import { Star, CheckCircle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Search, ChevronRight } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
+
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const CategoryPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useUserStore();
-  
-  const category = CATEGORY_MENUS.find(c => c.slug === slug);
 
-  // Redireciona usuários logados diretamente para a tela de novo pedido
-  // caso eles acessem a página da categoria sem um serviço específico selecionado.
-  useEffect(() => {
-    const servicoQuery = searchParams.get('servico');
-    if (isAuthenticated && category && !servicoQuery) {
-      navigate(`/request/new?category=${encodeURIComponent(category.name)}`, { replace: true });
-    }
-  }, [isAuthenticated, category, navigate, searchParams]);
+  const category = CATEGORY_MENUS.find(c => c.slug === slug);
+  const [query, setQuery] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
   // Se o usuário clicar em um serviço ou se vier do mega-menu com um serviço pré-selecionado
   useEffect(() => {
@@ -51,6 +47,15 @@ const CategoryPage = () => {
     }
   };
 
+  const baseItems = category?.groups ? (category.groups[activeTab]?.items || []) : (category?.items || []);
+  const visibleItems = useMemo(() => {
+    const q = normalize(query.trim());
+    if (!q) return baseItems;
+    // Com busca ativa, procura em todos os serviços da categoria, não só na aba atual.
+    const pool = category?.groups ? category.items : baseItems;
+    return pool.filter(item => normalize(item).includes(q));
+  }, [baseItems, query, category]);
+
   if (!category) {
     return (
       <div className="container mx-auto px-4 py-20 text-center">
@@ -60,90 +65,84 @@ const CategoryPage = () => {
     );
   }
 
+  const Icon = category.icon;
+  const searching = normalize(query.trim()).length > 0;
+
   return (
     <div className="bg-slate-50 min-h-screen pb-20">
-      {/* Breadcrumb */}
-      <div className="container mx-auto max-w-7xl px-4 py-4">
-        <div className="text-sm text-slate-500">
-          <Link to="/" className="hover:text-primary">Conecta Serviço</Link>
-          <span className="mx-2">›</span>
-          <span className="text-slate-900 font-medium">{category.name}</span>
+      <div className="max-w-2xl mx-auto px-4 pt-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200/60 transition-colors text-slate-700 flex-shrink-0"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-xl font-extrabold text-slate-900 text-center flex-1 px-2">{category.name}</h1>
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-primary flex-shrink-0">
+            <Icon className="w-5 h-5" />
+          </div>
         </div>
-      </div>
 
-      {/* Hero Section */}
-      <div className="container mx-auto max-w-7xl px-4">
-        <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 flex flex-col md:flex-row">
-          
-          {/* Text Content */}
-          <div className="flex-1 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 leading-tight mb-6">
-              Contrate os melhores Profissionais em <span className="text-primary">{category.name}</span>
-            </h1>
-            <p className="text-lg text-slate-600 mb-8">
-              Receba orçamentos de profissionais verificados. É rápido, seguro e gratuito!
-            </p>
+        {/* Busca */}
+        <div className="relative mb-5">
+          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="O que você precisa?"
+            className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-slate-100 text-slate-900 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-primary transition-all"
+          />
+        </div>
 
-            <ul className="space-y-4 mb-10">
-              <li className="flex items-center gap-3 text-slate-700 font-medium">
-                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                Até 4 orçamentos grátis e seguros
-              </li>
-              <li className="flex items-center gap-3 text-slate-700 font-medium">
-                <Star className="w-5 h-5 text-yellow-400 fill-current flex-shrink-0" />
-                Profissionais avaliados
-              </li>
-              <li className="flex items-center gap-3 text-slate-700 font-medium">
-                <HelpCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                Como funciona o Conecta Serviço?
-              </li>
-            </ul>
-
-            {/* Select Service Box */}
-            <div className="bg-yellow-400 p-6 md:p-8 rounded-2xl shadow-lg relative">
-              <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">
-                Qual serviço de {category.name} está precisando?
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {category.items.map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleServiceClick(item)}
-                      className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3 px-4 rounded-xl text-center shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all border border-slate-100 truncate w-full"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-            </div>
+        {/* Abas (só quando a categoria tem grupos, ex.: Serviços domésticos) */}
+        {category.groups && !searching && (
+          <div className="flex border-b border-slate-200 mb-1">
+            {category.groups.map((group, idx) => (
+              <button
+                key={group.label}
+                type="button"
+                onClick={() => setActiveTab(idx)}
+                className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wide transition-colors border-b-2 -mb-px ${
+                  activeTab === idx
+                    ? 'text-primary border-primary'
+                    : 'text-slate-500 border-transparent hover:text-slate-700'
+                }`}
+              >
+                {group.label}
+              </button>
+            ))}
           </div>
+        )}
 
-          {/* Image Content */}
-          <div className="hidden md:block w-2/5 relative min-h-[500px]">
-            <img 
-              src={category.image} 
-              alt={`Profissional de ${category.name}`} 
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            {/* Stats Badge */}
-            <div className="absolute bottom-8 right-8 bg-white p-5 rounded-2xl shadow-xl border border-slate-100 text-center">
-              <div className="text-3xl font-extrabold text-slate-900 flex items-center justify-center gap-2 mb-1">
-                4.8 <span className="text-lg text-slate-400 font-normal">/5</span>
-              </div>
-              <div className="flex justify-center text-yellow-400 mb-2">
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-                <Star className="w-4 h-4 fill-current" />
-              </div>
-              <p className="text-sm text-slate-500 font-medium">
-                Mais de 4.000 clientes avaliados
-              </p>
+        {/* Lista */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 mt-4 overflow-hidden">
+          {!searching && (
+            <h2 className="text-lg font-bold text-slate-900 px-5 pt-5 pb-1">
+              {category.groups ? category.groups[activeTab]?.label : category.name}
+            </h2>
+          )}
+          {visibleItems.length === 0 ? (
+            <p className="text-sm text-slate-500 px-5 py-8 text-center">Nenhum serviço encontrado para "{query}".</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {visibleItems.map(item => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleServiceClick(item)}
+                  className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+                >
+                  <span className="text-slate-700 font-medium">{item}</span>
+                  <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
+                </button>
+              ))}
             </div>
-          </div>
-
+          )}
         </div>
       </div>
     </div>
