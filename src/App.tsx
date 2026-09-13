@@ -17,7 +17,6 @@ import { Toaster } from 'react-hot-toast';
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
 const VerifyAccount = lazy(() => import('@/pages/VerifyAccount'));
-const Notifications = lazy(() => import('@/pages/Notifications'));
 const Home = lazy(() => import('@/pages/Home'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const JobDetails = lazy(() => import('@/pages/JobDetails'));
@@ -158,14 +157,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VerifyAccount />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notifications"
-              element={
-                <ProtectedRoute>
-                  <Notifications />
                 </ProtectedRoute>
               }
             />

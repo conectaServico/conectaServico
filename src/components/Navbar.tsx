@@ -7,13 +7,11 @@ import {
   MessageSquare,
   Home,
   ClipboardList,
-  Bell,
   ChevronDown,
   Plus,
 } from 'lucide-react';
 import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
-import { useNotifications } from '@/hooks/useNotifications';
 import { CATEGORY_MENUS } from '@/utils/categories';
 
 const Navbar = () => {
@@ -27,15 +25,12 @@ const Navbar = () => {
     setAudience(a);
     navigate('/');
   };
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const hasUnread = useUnreadMessages();
-  const { items: notifs, unreadCount, markAllRead, markRead } = useNotifications();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const notifMenuRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus when clicking outside
@@ -43,9 +38,6 @@ const Navbar = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
-      }
-      if (notifMenuRef.current && !notifMenuRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
       }
       if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
         setActiveCategory(null);
@@ -124,65 +116,6 @@ const Navbar = () => {
                   </div>
                   <span className="text-sm font-semibold hidden lg:block">Chat</span>
                 </Link>
-
-                {/* Notificações */}
-                <div className="relative" ref={notifMenuRef}>
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative flex items-center gap-2 text-slate-600 hover:text-primary px-3 py-2 rounded-lg transition-colors group"
-                  >
-                    <div className="relative">
-                      <Bell className="w-6 h-6 group-hover:fill-slate-100 rounded" />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold hidden lg:block">Avisos</span>
-                  </button>
-
-                  {/* Dropdown Notificações */}
-                  {showNotifications && (
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 overflow-hidden">
-                      <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-extrabold text-slate-800">Avisos</h3>
-                        {unreadCount > 0 && (
-                          <button onClick={markAllRead} className="text-xs font-bold text-primary hover:underline">
-                            Marcar lido
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-80 overflow-y-auto">
-                        {notifs.length === 0 ? (
-                          <p className="px-4 py-6 text-sm text-slate-400 text-center">Nenhum aviso ainda.</p>
-                        ) : (
-                          notifs.slice(0, 6).map((n) => (
-                            <button
-                              key={n.id}
-                              onClick={() => {
-                                if (!n.read) markRead(n.id);
-                                setShowNotifications(false);
-                                if (n.link) navigate(n.link);
-                              }}
-                              className={`w-full text-left block px-4 py-3 hover:bg-slate-50 border-b border-slate-50 ${!n.read ? 'bg-primary/5' : ''}`}
-                            >
-                              <p className="text-sm font-bold text-slate-800">{n.title}</p>
-                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.body}</p>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                      <Link
-                        to="/notifications"
-                        onClick={() => setShowNotifications(false)}
-                        className="block px-4 py-2.5 text-center text-sm font-bold text-primary hover:bg-slate-50 border-t border-slate-100"
-                      >
-                        Ver todos
-                      </Link>
-                    </div>
-                  )}
-                </div>
 
                 {/* User Menu Dropdown */}
                 <div className="relative ml-2" ref={userMenuRef}>
@@ -459,18 +392,6 @@ const Navbar = () => {
                 )}
               </div>
               <span className="text-[10px] font-bold">Chat</span>
-            </Link>
-
-            <Link to="/notifications" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/notifications') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
-              <div className="relative">
-                <Bell className="w-6 h-6" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-0.5 bg-danger text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] font-bold">Avisos</span>
             </Link>
 
             <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/profile') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
