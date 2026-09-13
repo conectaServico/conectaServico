@@ -206,12 +206,18 @@ const NewJob = () => {
   // perguntam quando o cliente pode receber o profissional.
   const needsAvailability = ['Reformas e Reparos', 'Serviços domésticos'].includes(category);
 
+  // Se o cliente já veio com um serviço específico escolhido (ex.: clicou
+  // numa subcategoria na Home ou na página da categoria), a tela de "qual
+  // serviço você precisa" já foi respondida — pula direto pra próxima
+  // pergunta em vez de pedir de novo.
+  const hasValidDefaultSubcategory = !!defaultSubcategory && !!CATEGORIES_MAP[category]?.includes(defaultSubcategory);
+
   // Lista ordenada das telas do Passo 1, uma pergunta por tela — GetNinjas mostra
   // exatamente uma decisão por página em vez de um formulário longo.
   const step1Screens = useMemo<Step1Screen[]>(() => {
     const screens: Step1Screen[] = [];
     if (!defaultCategory) screens.push('category');
-    screens.push('subcategory');
+    if (!hasValidDefaultSubcategory) screens.push('subcategory');
     screens.push('serviceType');
     if (needsAreaSize) screens.push('areaSize');
     if (needsBlueprint) screens.push('blueprint');
@@ -220,7 +226,7 @@ const NewJob = () => {
     if (needsAvailability) screens.push('availablePeriods');
     screens.push('urgency');
     return screens;
-  }, [defaultCategory, needsAreaSize, needsBlueprint, needsPropertyType, needsAvailability]);
+  }, [defaultCategory, hasValidDefaultSubcategory, needsAreaSize, needsBlueprint, needsPropertyType, needsAvailability]);
 
   const currentScreen = step1Screens[Math.min(microIndex, step1Screens.length - 1)];
 

@@ -141,7 +141,7 @@ export const SERVICE_IMAGES: Record<string, string> = {
   // Reformas e Reparos — Serviços Gerais
   'Marido de aluguel': 'https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=400&q=70',
   'Fretes e mudanças': 'https://images.unsplash.com/photo-1600518464441-9154a4dea21b?auto=format&fit=crop&w=400&q=70',
-  'Instalador de câmeras': 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=400&q=70',
+  'Instalador de câmeras': 'https://images.unsplash.com/photo-1676630656246-3047520adfdf?auto=format&fit=crop&w=400&q=70',
   'Segurança e alarmes': 'https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&q=70',
   'Aulas particulares': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=400&q=70',
   // Serviços domésticos
