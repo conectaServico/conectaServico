@@ -196,15 +196,15 @@ const NewJob = () => {
     }
   };
 
-  const needsAreaSize = ['Construção e reformas', 'Limpeza e manutenção', 'Serviços domésticos'].includes(category);
-  const needsPropertyType = ['Construção e reformas', 'Limpeza e manutenção', 'Serviços gerais', 'Serviços domésticos'].includes(category);
-  const needsBlueprint = category === 'Construção e reformas';
+  const needsAreaSize = ['Reformas e Reparos', 'Serviços domésticos'].includes(category);
+  const needsPropertyType = ['Reformas e Reparos', 'Serviços domésticos'].includes(category);
+  const needsBlueprint = category === 'Reformas e Reparos';
   // Só faz sentido perguntar quem fornece material (tinta, cano, cimento...) em
   // serviços físicos de obra — não em Design e Tecnologia, Assistência técnica etc.
-  const needsMaterials = category === 'Construção e reformas';
+  const needsMaterials = category === 'Reformas e Reparos';
   // Serviços que dependem de agenda (diarista, marido de aluguel, frete...)
   // perguntam quando o cliente pode receber o profissional.
-  const needsAvailability = ['Serviços gerais', 'Limpeza e manutenção', 'Serviços domésticos'].includes(category);
+  const needsAvailability = ['Reformas e Reparos', 'Serviços domésticos'].includes(category);
 
   // Lista ordenada das telas do Passo 1, uma pergunta por tela — GetNinjas mostra
   // exatamente uma decisão por página em vez de um formulário longo.

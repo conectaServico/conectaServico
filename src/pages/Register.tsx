@@ -22,7 +22,7 @@ const RECAPTCHA_ID = 'recaptcha-container-register';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_SECONDS = 30;
 
-const AVAILABLE_SERVICES = CATEGORIES_MAP['Construção e reformas'];
+const AVAILABLE_SERVICES = CATEGORIES_MAP['Reformas e Reparos'];
 
 const Register = () => {
   // Controle de Etapas

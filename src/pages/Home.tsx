@@ -194,11 +194,11 @@ const Home = () => {
                       className="flex overflow-x-auto hide-scrollbar gap-6 pb-4 snap-x w-full px-4 scroll-smooth"
                     >
                       {/* Card 1 */}
-                      <Link to="/categoria/construcao-e-reformas?servico=Eletricista" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
+                      <Link to="/categoria/reformas-e-reparos?servico=Eletricista" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
                         <div className="w-14 h-14 bg-yellow-50 rounded-full flex items-center justify-center text-yellow-500 mb-6 group-hover:scale-110 transition-transform">
                           <Zap className="w-7 h-7" />
                         </div>
-                        <p className="text-blue-500 font-medium text-sm mb-2">Construção e reformas</p>
+                        <p className="text-blue-500 font-medium text-sm mb-2">Reformas e Reparos</p>
                         <h3 className="text-xl font-bold text-blue-950 mb-6 group-hover:text-blue-600 transition-colors">Troca de fiação elétrica</h3>
 
                         <div className="space-y-3">
@@ -242,11 +242,11 @@ const Home = () => {
                       </Link>
 
                       {/* Card 3 */}
-                      <Link to="/categoria/servicos-gerais?servico=Montador%20de%20móveis" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
+                      <Link to="/categoria/reformas-e-reparos?servico=Montador%20de%20M%C3%B3veis" className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all snap-center flex-shrink-0 group">
                         <div className="w-14 h-14 bg-orange-50 rounded-full flex items-center justify-center text-orange-400 mb-6 group-hover:scale-110 transition-transform">
                           <Hammer className="w-7 h-7" />
                         </div>
-                        <p className="text-blue-500 font-medium text-sm mb-2">Serviços gerais</p>
+                        <p className="text-blue-500 font-medium text-sm mb-2">Reformas e Reparos</p>
                         <h3 className="text-xl font-bold text-blue-950 mb-6 group-hover:text-blue-600 transition-colors">Montagem de móveis</h3>
 
                         <div className="space-y-3">
