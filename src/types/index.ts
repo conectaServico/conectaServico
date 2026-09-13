@@ -89,6 +89,9 @@ export interface ServiceRequest {
   propertyType: string;
   areaSize?: string; // Metro quadrado (m²) do serviço
   hasBlueprint?: boolean; // Se possui planta do projeto
+  serviceType?: string; // Tipo específico dentro da subcategoria (ex.: Eletricista > "Instalação de ar condicionado")
+  availableDays?: string[]; // Dias que o cliente pode receber o profissional (Serviços gerais/Limpeza)
+  availablePeriods?: string[]; // Períodos do dia (Manhã/Tarde/Noite)
   preferredDate?: string; // Data preferencial para o serviço
   description: string;
   photos?: string[]; // fotos anexadas pelo cliente (Storage requestPhotos/<uid>/<reqId>)

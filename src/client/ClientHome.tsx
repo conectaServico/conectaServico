@@ -1,7 +1,8 @@
 import { useUserStore } from '@/store/userStore';
-import { Hammer, Zap, Droplets, PenTool, Wrench, PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
+import { PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
+import { CATEGORY_MENUS, imageForService } from '@/utils/categories';
 
 const clientBanners: Banner[] = [
   {
@@ -38,45 +39,6 @@ const clientBanners: Banner[] = [
 
 const ClientHome = () => {
   const { user } = useUserStore();
-
-  const categories = [
-    {
-      name: 'Pedreiro',
-      icon: Hammer,
-      label: 'Pedreiros',
-      image: 'https://images.unsplash.com/photo-1653280679689-078c04c417a1?auto=format&fit=crop&w=400&q=70',
-    },
-    {
-      name: 'Eletricista',
-      icon: Zap,
-      label: 'Eletricistas',
-      image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=400&q=70',
-    },
-    {
-      name: 'Encanador',
-      icon: Droplets,
-      label: 'Encanadores',
-      image: 'https://images.unsplash.com/photo-1749532125405-70950966b0e5?auto=format&fit=crop&w=400&q=70',
-    },
-    {
-      name: 'Gesseiro',
-      icon: PenTool,
-      label: 'Gesseiros',
-      image: 'https://images.unsplash.com/photo-1761986757577-140af8859587?auto=format&fit=crop&w=400&q=70',
-    },
-    {
-      name: 'Marido de aluguel',
-      icon: Wrench,
-      label: 'Marido de Aluguel',
-      image: 'https://images.unsplash.com/photo-1676630656246-3047520adfdf?auto=format&fit=crop&w=400&q=70',
-    },
-    {
-      name: 'Reformas',
-      icon: Wrench,
-      label: 'Reformas',
-      image: 'https://images.unsplash.com/photo-1505798577917-a65157d3320a?auto=format&fit=crop&w=400&q=70',
-    },
-  ];
 
   return (
     <div className="pb-24">
@@ -116,33 +78,39 @@ const ClientHome = () => {
           </Link>
         </div>
 
-        {/* Categories */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-900">Categorias</h2>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {categories.map((cat, idx) => (
-              <Link
-                to={cat.name === 'Marido de aluguel' ? `/categoria/servicos-gerais?servico=${cat.name}` : cat.name === 'Reformas' ? `/categoria/construcao-e-reformas` : `/categoria/construcao-e-reformas?servico=${cat.name}`}
-                key={idx}
-                className="group relative rounded-2xl overflow-hidden aspect-square shadow-sm hover:shadow-lg transition-all hover:-translate-y-0.5"
-              >
-                <img
-                  src={cat.image}
-                  alt={cat.label}
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/10 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                  <cat.icon className="w-4 h-4 text-white mb-1" />
-                  <span className="text-white font-bold text-[11px] leading-tight block">{cat.label}</span>
-                </div>
+        {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço
+            específico — cada bloco é a "categoria" (Reformas, Assistência
+            técnica, etc.), os cards dentro dela são os serviços individuais. */}
+        {CATEGORY_MENUS.map((cat) => (
+          <div key={cat.slug}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-900">{cat.name}</h2>
+              <Link to={`/categoria/${cat.slug}`} className="text-primary text-sm font-semibold flex-shrink-0">
+                Ver todos
               </Link>
-            ))}
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar">
+              {cat.items.map((service) => (
+                <Link
+                  key={service}
+                  to={`/request/new?category=${encodeURIComponent(cat.name)}&subcategory=${encodeURIComponent(service)}`}
+                  className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all flex-shrink-0 w-32 h-32 snap-start"
+                >
+                  <img
+                    src={imageForService(cat.name, service)}
+                    alt={service}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/10 to-transparent" />
+                  <span className="absolute bottom-2 left-2 right-2 text-white font-bold text-[11px] leading-tight">
+                    {service}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
 
         {/* Banner */}
         <div className="relative rounded-2xl overflow-hidden shadow-lg h-44">

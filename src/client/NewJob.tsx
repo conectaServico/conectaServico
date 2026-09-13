@@ -14,7 +14,7 @@ import { ServiceRequest, Urgency, MaterialOption } from '@/types';
 import { maskCEP, maskPhone } from '@/utils/masks';
 import OtpInput from '@/components/OtpInput';
 
-import { CATEGORIES_MAP, MAIN_CATEGORIES } from '@/utils/categories';
+import { CATEGORIES_MAP, MAIN_CATEGORIES, serviceTypeOptions, WEEKDAYS, DAY_PERIODS } from '@/utils/categories';
 
 const PROPERTY_TYPES = ['Casa', 'Apartamento', 'Comercial', 'Condomínio'];
 
@@ -49,6 +49,19 @@ const NewJob = () => {
   const [urgency, setUrgency] = useState<Urgency>('Média (Próximas semanas)');
   const [areaSize, setAreaSize] = useState('');
   const [hasBlueprint, setHasBlueprint] = useState<boolean | null>(null);
+  const [serviceType, setServiceType] = useState('');
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
+
+  // Toda vez que troca de serviço, o "tipo de serviço" do serviço anterior
+  // não faz mais sentido (as opções são outras).
+  useEffect(() => {
+    setServiceType('');
+  }, [subcategory]);
+
+  const toggleInList = (list: string[], setList: (v: string[]) => void, value: string) => {
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  };
 
   // Step 2
   const [description, setDescription] = useState('');
@@ -183,12 +196,19 @@ const NewJob = () => {
   // Só faz sentido perguntar quem fornece material (tinta, cano, cimento...) em
   // serviços físicos de obra — não em Design e Tecnologia, Assistência técnica etc.
   const needsMaterials = category === 'Construção e reformas';
+  // Serviços que dependem de agenda (diarista, marido de aluguel, frete...)
+  // perguntam quando o cliente pode receber o profissional.
+  const needsAvailability = ['Serviços gerais', 'Limpeza e manutenção'].includes(category);
 
   const nextStep = () => {
     setError('');
     if (step === 1) {
       if (!subcategory) {
         setError('Por favor, selecione o serviço específico.');
+        return;
+      }
+      if (!serviceType) {
+        setError('Por favor, selecione o tipo de serviço.');
         return;
       }
       if (needsAreaSize && (!areaSize || Number(areaSize) <= 0)) {
@@ -201,6 +221,10 @@ const NewJob = () => {
       }
       if (needsPropertyType && !propertyType) {
         setError('Por favor, selecione o tipo de imóvel.');
+        return;
+      }
+      if (needsAvailability && (availableDays.length === 0 || availablePeriods.length === 0)) {
+        setError('Por favor, informe quando você pode receber o profissional.');
         return;
       }
     }
@@ -263,6 +287,9 @@ const NewJob = () => {
         propertyType,
         areaSize,
         hasBlueprint: hasBlueprint ?? undefined,
+        serviceType: serviceType || undefined,
+        availableDays: needsAvailability ? availableDays : undefined,
+        availablePeriods: needsAvailability ? availablePeriods : undefined,
         preferredDate: preferredDate || undefined,
         description,
         searchTokens: buildSearchTokens([category, subcategory, description, city, neighborhood]),
@@ -394,6 +421,28 @@ const NewJob = () => {
               </div>
             )}
 
+            {subcategory && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-base font-bold text-slate-800 mb-3">Qual tipo de serviço você procura?</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {serviceTypeOptions(subcategory).map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setServiceType(opt)}
+                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer text-center min-h-[56px] flex items-center justify-center ${
+                        serviceType === opt
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {needsAreaSize && (
               <div>
                 <label className="block text-base font-bold text-slate-800 mb-3">Tamanho do espaço (m²)</label>
@@ -456,6 +505,43 @@ const NewJob = () => {
                       {type}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {needsAvailability && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-base font-bold text-slate-800 mb-3">Quando você pode receber o profissional?</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {WEEKDAYS.map(day => (
+                      <label key={day} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availableDays.includes(day) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={availableDays.includes(day)}
+                          onChange={() => toggleInList(availableDays, setAvailableDays, day)}
+                        />
+                        {day}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-base font-bold text-slate-800 mb-3">Marque os horários que você pode receber o profissional</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {DAY_PERIODS.map(period => (
+                      <label key={period} className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer transition-all text-sm font-bold ${availablePeriods.includes(period) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={availablePeriods.includes(period)}
+                          onChange={() => toggleInList(availablePeriods, setAvailablePeriods, period)}
+                        />
+                        {period}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -753,10 +839,17 @@ const NewJob = () => {
               </h4>
               <div className="space-y-2 text-sm">
                 <p><span className="text-slate-500">Categoria:</span> <strong className="text-slate-800">{category} &gt; {subcategory}</strong></p>
+                {serviceType && <p><span className="text-slate-500">Tipo de serviço:</span> <strong className="text-slate-800">{serviceType}</strong></p>}
                 <p><span className="text-slate-500">Local:</span> <strong className="text-slate-800">{neighborhood}, {city}</strong></p>
                 <p><span className="text-slate-500">Urgência:</span> <strong className="text-slate-800">{urgency}</strong></p>
                 {needsMaterials && <p><span className="text-slate-500">Material:</span> <strong className="text-slate-800">{materialOption}</strong></p>}
                 {areaSize && <p><span className="text-slate-500">Tamanho:</span> <strong className="text-slate-800">{areaSize} m²</strong></p>}
+                {needsAvailability && availableDays.length > 0 && (
+                  <p><span className="text-slate-500">Dias disponíveis:</span> <strong className="text-slate-800">{availableDays.join(', ')}</strong></p>
+                )}
+                {needsAvailability && availablePeriods.length > 0 && (
+                  <p><span className="text-slate-500">Horários:</span> <strong className="text-slate-800">{availablePeriods.join(', ')}</strong></p>
+                )}
                 {preferredDate && <p><span className="text-slate-500">Data Desejada:</span> <strong className="text-slate-800">{new Date(preferredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></p>}
               </div>
             </div>

@@ -686,6 +686,14 @@ const RequestDetails = () => {
                 <p className="text-xs text-slate-500 font-medium mb-1">Urgência</p>
                 <p className="font-bold text-slate-900 text-sm">{request.urgency}</p>
               </div>
+
+              {request.serviceType && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <Briefcase className="w-5 h-5 text-primary mb-2" />
+                  <p className="text-xs text-slate-500 font-medium mb-1">Tipo de serviço</p>
+                  <p className="font-bold text-slate-900 text-sm">{request.serviceType}</p>
+                </div>
+              )}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <Hammer className="w-5 h-5 text-primary mb-2" />
                 <p className="text-xs text-slate-500 font-medium mb-1">Materiais</p>
@@ -715,6 +723,22 @@ const RequestDetails = () => {
                   <p className="font-bold text-slate-900 text-sm">
                     {new Date(request.preferredDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                   </p>
+                </div>
+              )}
+
+              {request.availableDays && request.availableDays.length > 0 && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 sm:col-span-2">
+                  <Calendar className="w-5 h-5 text-primary mb-2" />
+                  <p className="text-xs text-slate-500 font-medium mb-1">Dias disponíveis</p>
+                  <p className="font-bold text-slate-900 text-sm">{request.availableDays.join(', ')}</p>
+                </div>
+              )}
+
+              {request.availablePeriods && request.availablePeriods.length > 0 && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 sm:col-span-2">
+                  <Clock className="w-5 h-5 text-primary mb-2" />
+                  <p className="text-xs text-slate-500 font-medium mb-1">Horários</p>
+                  <p className="font-bold text-slate-900 text-sm">{request.availablePeriods.join(', ')}</p>
                 </div>
               )}
 
