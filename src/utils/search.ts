@@ -13,7 +13,8 @@ const STOPWORDS = new Set([
   'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'que', 'ou', 'the', 'of',
 ]);
 
-function normalize(s: string): string {
+/** Minúsculas e sem acento — usado tanto pros tokens do Firestore quanto por filtros locais simples (ex.: busca de serviço no formulário de pedido). */
+export function normalize(s: string): string {
   return s
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')

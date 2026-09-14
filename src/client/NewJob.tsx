@@ -5,11 +5,11 @@ import { RecaptchaVerifier, PhoneAuthProvider } from 'firebase/auth';
 import { auth, db } from '@/services/firebase';
 import { confirmClientPhoneFn, callableErrorMessage } from '@/services/api';
 import { buildGeoFields } from '@/utils/geo';
-import { buildSearchTokens } from '@/utils/search';
+import { buildSearchTokens, normalize } from '@/utils/search';
 import { uploadImages } from '@/utils/images';
 import { useUserStore } from '@/store/userStore';
 import { useVerified, toE164BR } from '@/hooks/useVerified';
-import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2, ImagePlus, X, Phone } from 'lucide-react';
+import { Loader2, MapPin, AlertCircle, ChevronRight, CheckCircle2, ImagePlus, X, Phone, Search } from 'lucide-react';
 import { ServiceRequest, Urgency, MaterialOption } from '@/types';
 import { maskCEP, maskPhone } from '@/utils/masks';
 import OtpInput from '@/components/OtpInput';
@@ -39,6 +39,15 @@ const NewJob = () => {
   // Step 1
   const [category, setCategory] = useState(defaultCategory || MAIN_CATEGORIES[0]);
   const [subcategory, setSubcategory] = useState(defaultSubcategory || '');
+  // Busca dentro da grade de serviços — categorias como "Reformas e Reparos"
+  // têm 40+ opções, então digitar é mais rápido que rolar procurando.
+  const [subcategorySearch, setSubcategorySearch] = useState('');
+  const subcategoryOptions = useMemo(() => {
+    const all = CATEGORIES_MAP[category] || [];
+    const q = normalize(subcategorySearch.trim());
+    if (!q) return all;
+    return all.filter((sub) => normalize(sub).includes(q));
+  }, [category, subcategorySearch]);
 
   // Reset category if accessed directly without category in URL
   useEffect(() => {
@@ -46,6 +55,12 @@ const NewJob = () => {
       setCategory('');
     }
   }, [defaultCategory]);
+
+  // Troca de categoria limpa a busca — texto da categoria anterior não faz
+  // sentido filtrando a lista da nova.
+  useEffect(() => {
+    setSubcategorySearch('');
+  }, [category]);
 
   // Ao trocar de etapa/pergunta, volta o scroll para o topo do formulário.
   useEffect(() => {
@@ -480,22 +495,38 @@ const NewJob = () => {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[28rem] overflow-y-auto pr-1 -mr-1">
-                  {CATEGORIES_MAP[category]?.map(sub => (
-                    <button
-                      key={sub}
-                      type="button"
-                      onClick={() => setSubcategory(sub)}
-                      className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer flex items-center justify-center text-center min-h-[64px] ${
-                        subcategory === sub
-                          ? 'border-primary bg-primary text-white shadow-md scale-[1.02]'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-primary/50 hover:bg-slate-50'
-                      }`}
-                    >
-                      {sub}
-                    </button>
-                  ))}
+                <div className="relative mb-3">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={subcategorySearch}
+                    onChange={(e) => setSubcategorySearch(e.target.value)}
+                    placeholder="Não achou? Busque pelo nome do serviço..."
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-medium focus:border-primary focus:outline-none"
+                  />
                 </div>
+                {subcategoryOptions.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-6">
+                    Nenhum serviço encontrado para &quot;{subcategorySearch}&quot;. Tente outro termo ou descreva em detalhes no próximo passo.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[28rem] overflow-y-auto pr-1 -mr-1">
+                    {subcategoryOptions.map(sub => (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => setSubcategory(sub)}
+                        className={`p-3 rounded-xl border-2 text-sm font-bold transition-all cursor-pointer flex items-center justify-center text-center min-h-[64px] ${
+                          subcategory === sub
+                            ? 'border-primary bg-primary text-white shadow-md scale-[1.02]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-primary/50 hover:bg-slate-50'
+                        }`}
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

@@ -37,6 +37,13 @@ const clientBanners: Banner[] = [
   },
 ];
 
+// Serviços da aba "iBike" (bike elétrica) dentro de "Assistência técnica" —
+// lidos direto do CATEGORY_MENUS pra nunca ficar fora de sincronia.
+const IBIKE_CATEGORY = 'Assistência técnica';
+const IBIKE_SERVICES =
+  CATEGORY_MENUS.find((c) => c.name === IBIKE_CATEGORY)?.groups?.find((g) => g.label === 'iBike')?.items || [];
+const IBIKE_HERO_IMAGE = 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75';
+
 const ClientHome = () => {
   const { user } = useUserStore();
 
@@ -76,6 +83,40 @@ const ClientHome = () => {
             </div>
             <span className="font-semibold text-slate-700 text-sm">Meus Pedidos</span>
           </Link>
+        </div>
+
+        {/* iBike — bike elétrica está em alta, seção de destaque logo na entrada
+            com foto grande e só os serviços de manutenção dela. */}
+        <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+          <div className="relative h-52">
+            <img
+              src={IBIKE_HERO_IMAGE}
+              alt="Bike elétrica"
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/25 to-transparent" />
+            <div className="absolute bottom-4 left-4 right-4">
+              <span className="inline-block bg-primary text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-2">
+                Em alta
+              </span>
+              <h2 className="text-white text-2xl font-bold leading-tight">iBike</h2>
+              <p className="text-slate-200 text-sm">Manutenção completa para a sua bike elétrica</p>
+            </div>
+          </div>
+          <div className="bg-white p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {IBIKE_SERVICES.map((service) => (
+                <Link
+                  key={service}
+                  to={`/request/new?category=${encodeURIComponent(IBIKE_CATEGORY)}&subcategory=${encodeURIComponent(service)}`}
+                  className="flex items-center justify-center text-center bg-slate-50 hover:bg-primary/5 border border-slate-100 hover:border-primary/30 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors"
+                >
+                  {service}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço

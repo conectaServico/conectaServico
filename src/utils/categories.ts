@@ -65,7 +65,14 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
     name: 'Assistência técnica',
     slug: 'assistencia-tecnica',
     icon: Wrench,
-    items: ['Ar condicionado', 'Máquina de lavar', 'Técnico de informática', 'Aquecedor a gás', 'Geladeira e freezer', 'Técnico de celular'],
+    // Aba "iBike" — bike elétrica está em alta, então ganhou destaque próprio
+    // em vez de ficar perdida junto dos eletrodomésticos.
+    groups: [
+      { label: 'Eletrodomésticos', items: ['Ar condicionado', 'Máquina de lavar', 'Aquecedor a gás', 'Geladeira e freezer'] },
+      { label: 'Eletrônicos', items: ['Técnico de informática', 'Técnico de celular'] },
+      { label: 'iBike', items: ['Troca de bateria', 'Motor elétrico', 'Freios', 'Pneus e câmaras', 'Corrente e marchas', 'Revisão geral'] },
+    ],
+    items: ['Ar condicionado', 'Máquina de lavar', 'Aquecedor a gás', 'Geladeira e freezer', 'Técnico de informática', 'Técnico de celular', 'Troca de bateria', 'Motor elétrico', 'Freios', 'Pneus e câmaras', 'Corrente e marchas', 'Revisão geral'],
     image: 'https://images.unsplash.com/photo-1721333089073-215a56fd710c?auto=format&fit=crop&w=800&q=80'
   },
   {
@@ -105,6 +112,13 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Máquina de lavar': 'https://images.unsplash.com/photo-1622473590925-e3616c0a41bf?auto=format&fit=crop&w=400&q=70',
   'Técnico de celular': 'https://images.unsplash.com/photo-1550041473-d296a3a8a18a?auto=format&fit=crop&w=400&q=70',
   'Técnico de informática': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=70',
+  // Assistência técnica — iBike
+  'Troca de bateria': 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=400&q=70',
+  'Motor elétrico': 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=400&q=70',
+  'Freios': 'https://images.unsplash.com/photo-1675798227643-da319f8ee8f7?auto=format&fit=crop&w=400&q=70',
+  'Pneus e câmaras': 'https://images.unsplash.com/photo-1687203627800-da3fb4db92eb?auto=format&fit=crop&w=400&q=70',
+  'Corrente e marchas': 'https://images.unsplash.com/photo-1738769911835-54f3cac68edd?auto=format&fit=crop&w=400&q=70',
+  'Revisão geral': 'https://images.unsplash.com/photo-1675798227643-da319f8ee8f7?auto=format&fit=crop&w=400&q=70',
   'Desenvolvedor de sites': 'https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=400&q=70',
   'Designer gráfico': 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=400&q=70',
   'Marketing digital': 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?auto=format&fit=crop&w=400&q=70',
@@ -189,6 +203,13 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   'Máquina de lavar': ['Conserto', 'Manutenção', 'Instalação', 'Outro'],
   'Técnico de celular': ['Troca de tela', 'Troca de bateria', 'Não liga', 'Outro'],
   'Técnico de informática': ['Formatação', 'Vírus/malware', 'Não liga', 'Lentidão', 'Outro'],
+  // Assistência técnica — iBike
+  'Troca de bateria': ['Bateria não carrega', 'Autonomia caiu muito', 'Troca por bateria nova', 'Outro'],
+  'Motor elétrico': ['Motor não liga', 'Ruído/vibração', 'Perda de potência', 'Outro'],
+  'Freios': ['Freio a disco', 'Freio V-brake', 'Troca de pastilha/lona', 'Outro'],
+  'Pneus e câmaras': ['Furo/câmara', 'Troca de pneu', 'Calibragem', 'Outro'],
+  'Corrente e marchas': ['Troca de corrente', 'Ajuste de câmbio', 'Troca de cassete/coroa', 'Outro'],
+  'Revisão geral': ['Revisão periódica', 'Antes de uma viagem', 'Bike parada há tempo', 'Outro'],
   // Design e Tecnologia
   'Desenvolvedor de sites': ['Site novo', 'Manutenção de site existente', 'Loja virtual', 'Outro'],
   'Designer gráfico': ['Identidade visual/logo', 'Material impresso', 'Redes sociais', 'Outro'],
