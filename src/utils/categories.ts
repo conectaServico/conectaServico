@@ -58,7 +58,9 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
       { label: 'Para Pets', items: ['Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'] },
     ],
     items: ['Diarista', 'Limpeza de Piscina', 'Passadeira', 'Personal Shopper', 'Lavadeira', 'Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular', 'Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'],
-    image: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=800&q=80'
+    // Capa da categoria = foto da Diarista (serviço mais comum do grupo) — antes
+    // estava com a foto de bebê da Babá, que não representa "Serviços domésticos".
+    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80'
   },
   {
     name: 'Assistência técnica',
