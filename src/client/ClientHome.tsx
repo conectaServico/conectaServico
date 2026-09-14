@@ -1,4 +1,4 @@
-import { PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
+import { PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 import { CATEGORY_MENUS, imageForService } from '@/utils/categories';
@@ -36,50 +36,31 @@ const clientBanners: Banner[] = [
   },
 ];
 
-// Serviços da aba "Scooter Elétrica" (dentro de "Assistência técnica") —
-// lidos direto do CATEGORY_MENUS pra nunca ficar fora de sincronia com a
-// categoria.
-const TECH_CATEGORY = 'Assistência técnica';
-const groupItems = (label: string) =>
-  CATEGORY_MENUS.find((c) => c.name === TECH_CATEGORY)?.groups?.find((g) => g.label === label)?.items || [];
-
-interface FeaturedSectionProps {
-  badge: string;
+interface FeaturedServiceCardProps {
   title: string;
-  subtitle: string;
+  description: string;
   image: string;
-  services: string[];
+  to: string;
 }
 
-// Seção grande de destaque na entrada da home — foto grande + só os serviços
-// daquele "produto" específico, pro cliente bater o olho e já pedir.
-const FeaturedServiceSection = ({ badge, title, subtitle, image, services }: FeaturedSectionProps) => (
-  <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
-    <div className="relative h-52">
-      <img src={image} alt={title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/25 to-transparent" />
-      <div className="absolute bottom-4 left-4 right-4">
-        <span className="inline-block bg-primary text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-2">
-          {badge}
-        </span>
-        <h2 className="text-white text-2xl font-bold leading-tight">{title}</h2>
-        <p className="text-slate-200 text-sm">{subtitle}</p>
+// Card de destaque de um serviço específico — foto grande em cima, card branco
+// embaixo com a frase e a seta de "ver detalhes" (mesmo padrão do card de
+// "Diarista" da referência do GetNinjas).
+const FeaturedServiceCard = ({ title, description, image, to }: FeaturedServiceCardProps) => (
+  <Link to={to} className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+    <div className="h-44">
+      <img src={image} alt={title} loading="lazy" className="w-full h-full object-cover" />
+    </div>
+    <div className="p-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="font-bold text-slate-900 text-base mb-0.5">{title}</h3>
+        <p className="text-sm text-slate-500 truncate">{description}</p>
+      </div>
+      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+        <ArrowRight className="w-5 h-5 text-white" />
       </div>
     </div>
-    <div className="bg-white p-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        {services.map((service) => (
-          <Link
-            key={service}
-            to={`/request/new?category=${encodeURIComponent(TECH_CATEGORY)}&subcategory=${encodeURIComponent(service)}`}
-            className="flex items-center justify-center text-center bg-slate-50 hover:bg-primary/5 border border-slate-100 hover:border-primary/30 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors"
-          >
-            {service}
-          </Link>
-        ))}
-      </div>
-    </div>
-  </div>
+  </Link>
 );
 
 const ClientHome = () => {
@@ -90,6 +71,16 @@ const ClientHome = () => {
           ocupava espaço no topo da home à toa. */}
       <div className="px-4 pt-6 space-y-8">
         <BannerCarousel banners={clientBanners} />
+
+        {/* Mobilidade elétrica está em alta — logo abaixo do banner, igual à
+            referência (card da "Diarista"): foto grande + card branco com a
+            frase e a seta que leva pra lista de serviços daquela categoria. */}
+        <FeaturedServiceCard
+          title="Scooter Elétrica"
+          description="Troca de bateria, freios, pneus e mais"
+          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
+          to={`/categoria/assistencia-tecnica?aba=${encodeURIComponent('Scooter Elétrica')}`}
+        />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
@@ -106,16 +97,6 @@ const ClientHome = () => {
             <span className="font-semibold text-slate-700 text-sm">Meus Pedidos</span>
           </Link>
         </div>
-
-        {/* Mobilidade elétrica está em alta — seção de destaque logo na entrada,
-            com foto grande e só os serviços de manutenção dela. */}
-        <FeaturedServiceSection
-          badge="Em alta"
-          title="Scooter Elétrica"
-          subtitle="Manutenção completa para a sua bike/scooter elétrica"
-          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
-          services={groupItems('Scooter Elétrica')}
-        />
 
         {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço
             específico — cada bloco é a "categoria" (Reformas, Assistência
