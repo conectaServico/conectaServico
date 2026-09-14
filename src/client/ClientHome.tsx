@@ -1,7 +1,14 @@
-import { PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { PlusCircle, ShieldCheck, MessageSquare, Star, ArrowRight, Search, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 import { CATEGORY_MENUS, imageForService } from '@/utils/categories';
+import { normalize } from '@/utils/search';
+
+// Todos os serviços de todas as categorias, achatados — usado só pela busca
+// da home (digitar "eletricista" já sugere direto, sem precisar navegar por
+// categoria primeiro).
+const ALL_SERVICES = CATEGORY_MENUS.flatMap((cat) => cat.items.map((service) => ({ category: cat.name, service })));
 
 const clientBanners: Banner[] = [
   {
@@ -64,12 +71,60 @@ const FeaturedServiceCard = ({ title, description, image, to }: FeaturedServiceC
 );
 
 const ClientHome = () => {
+  const [search, setSearch] = useState('');
+  const q = normalize(search.trim());
+  const searching = q.length > 0;
+  const results = searching ? ALL_SERVICES.filter(({ service }) => normalize(service).includes(q)).slice(0, 8) : [];
+
   return (
     <div className="pb-24">
       {/* Sem cabeçalho de "bem-vindo"/nome aqui — o Navbar já dá acesso ao perfil
           (dropdown no desktop, aba "Perfil" no rodapé mobile); duplicar só
           ocupava espaço no topo da home à toa. */}
       <div className="px-4 pt-6 space-y-8">
+        {/* Busca — primeira coisa da home, igual à referência. Digitando, some
+            o resto (banner/categorias) e mostra só os serviços que baterem,
+            de qualquer categoria. */}
+        <div>
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="O que você precisa?"
+              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-3 py-3 text-sm font-medium text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          {searching && (
+            <div className="mt-2 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              {results.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center px-4 py-4">
+                  Nenhum serviço encontrado para &quot;{search}&quot;.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {results.map(({ category, service }) => (
+                    <Link
+                      key={`${category}-${service}`}
+                      to={`/request/new?category=${encodeURIComponent(category)}&subcategory=${encodeURIComponent(service)}`}
+                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{service}</p>
+                        <p className="text-xs text-slate-400">{category}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {searching ? null : (
+        <>
         <BannerCarousel banners={clientBanners} />
 
         {/* Mobilidade elétrica está em alta — logo abaixo do banner, igual à
@@ -81,22 +136,6 @@ const ClientHome = () => {
           image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
           to={`/categoria/assistencia-tecnica?aba=${encodeURIComponent('Scooter Elétrica')}`}
         />
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Link to="/request/new" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <PlusCircle className="w-6 h-6" />
-            </div>
-            <span className="font-semibold text-slate-700 text-sm">Novo Pedido</span>
-          </Link>
-          <Link to="/requests" className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <ClipboardList className="w-6 h-6" />
-            </div>
-            <span className="font-semibold text-slate-700 text-sm">Meus Pedidos</span>
-          </Link>
-        </div>
 
         {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço
             específico — cada bloco é a "categoria" (Reformas, Assistência
@@ -149,6 +188,8 @@ const ClientHome = () => {
             </Link>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
