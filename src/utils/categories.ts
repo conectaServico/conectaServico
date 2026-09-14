@@ -33,13 +33,13 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
     groups: [
       { label: 'Construção', items: ['Pedreiro', 'Arquiteto', 'Azulejista', 'Limpeza Pós Obra', 'Engenheiro', 'Marmoraria e Granitos', 'Poço Artesiano', 'Remoção de Entulho', 'Telhadista', 'Impermeabilização', 'Design de Interiores'] },
       { label: 'Reformas e Reparos', items: ['Eletricista', 'Gesso e DryWall', 'Pintor', 'Vidraceiro', 'Serralheria e Solda', 'Encanador', 'Gás', 'Pavimentação'] },
-      { label: 'Instalação', items: ['Segurança Eletrônica', 'Automação Residencial', 'Instalação de eletrônicos', 'Antenista', 'Toldos e Coberturas'] },
+      { label: 'Instalação', items: ['Segurança Eletrônica', 'Automação Residencial', 'Instalação de eletrônicos', 'Antenista', 'Toldos e Coberturas', 'Energia Solar'] },
       { label: "Para a Casa", items: ["Decorador", "Montador de Móveis", "Marceneiro", "Paisagista", "Jardinagem", "Piscina", "Redes de Proteção", "Coifas e Exaustores", "Dedetização", "Lavagem de sofá", "Limpeza de caixa d'água"] },
     ],
     items: [
       "Pedreiro", "Arquiteto", "Azulejista", "Limpeza Pós Obra", "Engenheiro", "Marmoraria e Granitos", "Poço Artesiano", "Remoção de Entulho", "Telhadista", "Impermeabilização", "Design de Interiores",
       "Eletricista", "Gesso e DryWall", "Pintor", "Vidraceiro", "Serralheria e Solda", "Encanador", "Gás", "Pavimentação",
-      "Segurança Eletrônica", "Automação Residencial", "Instalação de eletrônicos", "Antenista", "Toldos e Coberturas",
+      "Segurança Eletrônica", "Automação Residencial", "Instalação de eletrônicos", "Antenista", "Toldos e Coberturas", "Energia Solar",
       "Decorador", "Montador de Móveis", "Marceneiro", "Paisagista", "Jardinagem", "Piscina", "Redes de Proteção", "Coifas e Exaustores", "Dedetização", "Lavagem de sofá", "Limpeza de caixa d'água",
     ],
     image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80"
@@ -65,14 +65,16 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
     name: 'Assistência técnica',
     slug: 'assistencia-tecnica',
     icon: Wrench,
-    // Aba "iBike" — bike elétrica está em alta, então ganhou destaque próprio
-    // em vez de ficar perdida junto dos eletrodomésticos.
+    // Abas "iBike" e "Scooter Elétrica" — mobilidade elétrica está em alta,
+    // então ganharam destaque próprio em vez de ficar perdidas junto dos
+    // eletrodomésticos.
     groups: [
       { label: 'Eletrodomésticos', items: ['Ar condicionado', 'Máquina de lavar', 'Aquecedor a gás', 'Geladeira e freezer'] },
       { label: 'Eletrônicos', items: ['Técnico de informática', 'Técnico de celular'] },
       { label: 'iBike', items: ['Troca de bateria', 'Motor elétrico', 'Freios', 'Pneus e câmaras', 'Corrente e marchas', 'Revisão geral'] },
+      { label: 'Scooter Elétrica', items: ['Bateria do patinete', 'Motor do patinete', 'Freio do patinete', 'Pneu do patinete', 'Guidão e dobradiça', 'Revisão do patinete'] },
     ],
-    items: ['Ar condicionado', 'Máquina de lavar', 'Aquecedor a gás', 'Geladeira e freezer', 'Técnico de informática', 'Técnico de celular', 'Troca de bateria', 'Motor elétrico', 'Freios', 'Pneus e câmaras', 'Corrente e marchas', 'Revisão geral'],
+    items: ['Ar condicionado', 'Máquina de lavar', 'Aquecedor a gás', 'Geladeira e freezer', 'Técnico de informática', 'Técnico de celular', 'Troca de bateria', 'Motor elétrico', 'Freios', 'Pneus e câmaras', 'Corrente e marchas', 'Revisão geral', 'Bateria do patinete', 'Motor do patinete', 'Freio do patinete', 'Pneu do patinete', 'Guidão e dobradiça', 'Revisão do patinete'],
     image: 'https://images.unsplash.com/photo-1721333089073-215a56fd710c?auto=format&fit=crop&w=800&q=80'
   },
   {
@@ -119,6 +121,13 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Pneus e câmaras': 'https://images.unsplash.com/photo-1687203627800-da3fb4db92eb?auto=format&fit=crop&w=400&q=70',
   'Corrente e marchas': 'https://images.unsplash.com/photo-1738769911835-54f3cac68edd?auto=format&fit=crop&w=400&q=70',
   'Revisão geral': 'https://images.unsplash.com/photo-1675798227643-da319f8ee8f7?auto=format&fit=crop&w=400&q=70',
+  // Assistência técnica — Scooter Elétrica
+  'Bateria do patinete': 'https://images.unsplash.com/photo-1657008846502-e03a84f49baa?auto=format&fit=crop&w=400&q=70',
+  'Motor do patinete': 'https://images.unsplash.com/photo-1657008846502-e03a84f49baa?auto=format&fit=crop&w=400&q=70',
+  'Freio do patinete': 'https://images.unsplash.com/photo-1597260491619-bab87197869f?auto=format&fit=crop&w=400&q=70',
+  'Pneu do patinete': 'https://images.unsplash.com/photo-1597260491619-bab87197869f?auto=format&fit=crop&w=400&q=70',
+  'Guidão e dobradiça': 'https://images.unsplash.com/photo-1657008846502-e03a84f49baa?auto=format&fit=crop&w=400&q=70',
+  'Revisão do patinete': 'https://images.unsplash.com/photo-1597260491619-bab87197869f?auto=format&fit=crop&w=400&q=70',
   'Desenvolvedor de sites': 'https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=400&q=70',
   'Designer gráfico': 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=400&q=70',
   'Marketing digital': 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?auto=format&fit=crop&w=400&q=70',
@@ -150,6 +159,7 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Instalação de eletrônicos': 'https://images.unsplash.com/photo-1635788798247-92a15f830a3b?auto=format&fit=crop&w=400&q=70',
   'Antenista': 'https://images.unsplash.com/photo-1761795111868-4851b056cf63?auto=format&fit=crop&w=400&q=70',
   'Toldos e Coberturas': 'https://images.unsplash.com/photo-1741971282313-fb25835b1d24?auto=format&fit=crop&w=400&q=70',
+  'Energia Solar': 'https://images.unsplash.com/photo-1624397640148-949b1732bb0a?auto=format&fit=crop&w=400&q=70',
   // Reformas e Reparos — Para a Casa
   'Decorador': 'https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?auto=format&fit=crop&w=400&q=70',
   'Montador de Móveis': 'https://images.unsplash.com/photo-1590635023142-73c3d34f2805?auto=format&fit=crop&w=400&q=70',
@@ -210,6 +220,13 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   'Pneus e câmaras': ['Furo/câmara', 'Troca de pneu', 'Calibragem', 'Outro'],
   'Corrente e marchas': ['Troca de corrente', 'Ajuste de câmbio', 'Troca de cassete/coroa', 'Outro'],
   'Revisão geral': ['Revisão periódica', 'Antes de uma viagem', 'Bike parada há tempo', 'Outro'],
+  // Assistência técnica — Scooter Elétrica
+  'Bateria do patinete': ['Bateria não carrega', 'Autonomia caiu muito', 'Troca por bateria nova', 'Outro'],
+  'Motor do patinete': ['Motor não liga', 'Ruído/vibração', 'Perda de potência', 'Outro'],
+  'Freio do patinete': ['Freio a disco', 'Freio elétrico/regenerativo', 'Troca de pastilha', 'Outro'],
+  'Pneu do patinete': ['Furo/câmara', 'Troca de pneu', 'Calibragem', 'Outro'],
+  'Guidão e dobradiça': ['Guidão frouxo/solto', 'Dobradiça travando', 'Ajuste geral', 'Outro'],
+  'Revisão do patinete': ['Revisão periódica', 'Antes de uma viagem', 'Parado há tempo', 'Outro'],
   // Design e Tecnologia
   'Desenvolvedor de sites': ['Site novo', 'Manutenção de site existente', 'Loja virtual', 'Outro'],
   'Designer gráfico': ['Identidade visual/logo', 'Material impresso', 'Redes sociais', 'Outro'],
@@ -242,6 +259,7 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   'Instalação de eletrônicos': ['TV/Home theater', 'Rede/Wi-Fi', 'Outro'],
   'Antenista': ['Instalação', 'Ajuste de sinal', 'Manutenção', 'Outro'],
   'Toldos e Coberturas': ['Toldo retrátil', 'Cobertura fixa', 'Manutenção', 'Outro'],
+  'Energia Solar': ['Instalação de painéis', 'Manutenção/limpeza', 'Ampliação do sistema', 'Outro'],
   // Reformas e Reparos — Para a Casa
   'Montador de Móveis': ['Móveis planejados', 'Móveis de loja (MDF)', 'Desmontagem', 'Outro'],
   'Decorador': ['Consultoria de decoração', 'Projeto completo', 'Outro'],

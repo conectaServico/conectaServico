@@ -37,30 +37,66 @@ const clientBanners: Banner[] = [
   },
 ];
 
-// Serviços da aba "iBike" (bike elétrica) dentro de "Assistência técnica" —
-// lidos direto do CATEGORY_MENUS pra nunca ficar fora de sincronia.
-const IBIKE_CATEGORY = 'Assistência técnica';
-const IBIKE_SERVICES =
-  CATEGORY_MENUS.find((c) => c.name === IBIKE_CATEGORY)?.groups?.find((g) => g.label === 'iBike')?.items || [];
-const IBIKE_HERO_IMAGE = 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75';
+// Serviços de mobilidade elétrica (abas "iBike"/"Scooter Elétrica" dentro de
+// "Assistência técnica") — lidos direto do CATEGORY_MENUS pra nunca ficar
+// fora de sincronia com a categoria.
+const TECH_CATEGORY = 'Assistência técnica';
+const groupItems = (label: string) =>
+  CATEGORY_MENUS.find((c) => c.name === TECH_CATEGORY)?.groups?.find((g) => g.label === label)?.items || [];
+
+interface FeaturedSectionProps {
+  badge: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  services: string[];
+}
+
+// Seção grande de destaque na entrada da home — foto grande + só os serviços
+// daquele "produto" específico, pro cliente bater o olho e já pedir.
+const FeaturedServiceSection = ({ badge, title, subtitle, image, services }: FeaturedSectionProps) => (
+  <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+    <div className="relative h-52">
+      <img src={image} alt={title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/25 to-transparent" />
+      <div className="absolute bottom-4 left-4 right-4">
+        <span className="inline-block bg-primary text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-2">
+          {badge}
+        </span>
+        <h2 className="text-white text-2xl font-bold leading-tight">{title}</h2>
+        <p className="text-slate-200 text-sm">{subtitle}</p>
+      </div>
+    </div>
+    <div className="bg-white p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {services.map((service) => (
+          <Link
+            key={service}
+            to={`/request/new?category=${encodeURIComponent(TECH_CATEGORY)}&subcategory=${encodeURIComponent(service)}`}
+            className="flex items-center justify-center text-center bg-slate-50 hover:bg-primary/5 border border-slate-100 hover:border-primary/30 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors"
+          >
+            {service}
+          </Link>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 const ClientHome = () => {
   const { user } = useUserStore();
 
   return (
     <div className="pb-24">
-      {/* Header Profile */}
-      <div className="bg-primary pt-8 pb-6 px-4 rounded-b-3xl shadow-md text-white">
+      {/* Header Profile — compacto, sem legenda "bem-vindo" pra não ocupar espaço à toa. */}
+      <div className="bg-primary py-4 px-4 rounded-b-2xl shadow-md text-white">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-primary-100 text-sm font-medium">Bem-vindo(a) de volta,</p>
-            <h1 className="text-2xl font-bold">{user?.name?.split(' ')[0]}</h1>
-          </div>
-          <Link to="/profile" className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm overflow-hidden border-2 border-white/30">
+          <h1 className="text-xl font-bold">{user?.name?.split(' ')[0]}</h1>
+          <Link to="/profile" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm overflow-hidden border-2 border-white/30">
             {user?.photo_url ? (
               <img src={user.photo_url} alt="Perfil" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-xl font-bold">{user?.name?.charAt(0)}</span>
+              <span className="text-lg font-bold">{user?.name?.charAt(0)}</span>
             )}
           </Link>
         </div>
@@ -85,39 +121,22 @@ const ClientHome = () => {
           </Link>
         </div>
 
-        {/* iBike — bike elétrica está em alta, seção de destaque logo na entrada
-            com foto grande e só os serviços de manutenção dela. */}
-        <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-100">
-          <div className="relative h-52">
-            <img
-              src={IBIKE_HERO_IMAGE}
-              alt="Bike elétrica"
-              loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/25 to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4">
-              <span className="inline-block bg-primary text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-2">
-                Em alta
-              </span>
-              <h2 className="text-white text-2xl font-bold leading-tight">iBike</h2>
-              <p className="text-slate-200 text-sm">Manutenção completa para a sua bike elétrica</p>
-            </div>
-          </div>
-          <div className="bg-white p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {IBIKE_SERVICES.map((service) => (
-                <Link
-                  key={service}
-                  to={`/request/new?category=${encodeURIComponent(IBIKE_CATEGORY)}&subcategory=${encodeURIComponent(service)}`}
-                  className="flex items-center justify-center text-center bg-slate-50 hover:bg-primary/5 border border-slate-100 hover:border-primary/30 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors"
-                >
-                  {service}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Mobilidade elétrica está em alta — seções de destaque logo na entrada,
+            cada uma com foto grande e só os serviços de manutenção daquele veículo. */}
+        <FeaturedServiceSection
+          badge="Em alta"
+          title="iBike"
+          subtitle="Manutenção completa para a sua bike elétrica"
+          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
+          services={groupItems('iBike')}
+        />
+        <FeaturedServiceSection
+          badge="Novidade"
+          title="Scooter Elétrica"
+          subtitle="Manutenção completa para o seu patinete elétrico"
+          image="https://images.unsplash.com/photo-1657008846502-e03a84f49baa?auto=format&fit=crop&w=900&q=75"
+          services={groupItems('Scooter Elétrica')}
+        />
 
         {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço
             específico — cada bloco é a "categoria" (Reformas, Assistência
