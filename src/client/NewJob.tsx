@@ -477,6 +477,16 @@ const NewJob = () => {
 
             {currentScreen === 'subcategory' && (
               <div>
+                <div className="relative mb-4">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={subcategorySearch}
+                    onChange={(e) => setSubcategorySearch(e.target.value)}
+                    placeholder="Não achou? Busque pelo nome do serviço..."
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-medium focus:border-primary focus:outline-none"
+                  />
+                </div>
                 <div className="flex items-center justify-between mb-4">
                   <label className="block text-xl font-bold text-slate-800">
                     {!defaultCategory ? `Qual serviço de ${category} você precisa?` : 'Qual serviço você precisa?'}
@@ -494,16 +504,6 @@ const NewJob = () => {
                       Trocar categoria
                     </button>
                   )}
-                </div>
-                <div className="relative mb-3">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={subcategorySearch}
-                    onChange={(e) => setSubcategorySearch(e.target.value)}
-                    placeholder="Não achou? Busque pelo nome do serviço..."
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-medium focus:border-primary focus:outline-none"
-                  />
                 </div>
                 {subcategoryOptions.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-6">

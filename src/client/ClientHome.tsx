@@ -1,4 +1,3 @@
-import { useUserStore } from '@/store/userStore';
 import { PlusCircle, ClipboardList, ShieldCheck, MessageSquare, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
@@ -37,9 +36,9 @@ const clientBanners: Banner[] = [
   },
 ];
 
-// Serviços de mobilidade elétrica (abas "iBike"/"Scooter Elétrica" dentro de
-// "Assistência técnica") — lidos direto do CATEGORY_MENUS pra nunca ficar
-// fora de sincronia com a categoria.
+// Serviços da aba "Scooter Elétrica" (dentro de "Assistência técnica") —
+// lidos direto do CATEGORY_MENUS pra nunca ficar fora de sincronia com a
+// categoria.
 const TECH_CATEGORY = 'Assistência técnica';
 const groupItems = (label: string) =>
   CATEGORY_MENUS.find((c) => c.name === TECH_CATEGORY)?.groups?.find((g) => g.label === label)?.items || [];
@@ -84,25 +83,12 @@ const FeaturedServiceSection = ({ badge, title, subtitle, image, services }: Fea
 );
 
 const ClientHome = () => {
-  const { user } = useUserStore();
-
   return (
     <div className="pb-24">
-      {/* Header Profile — compacto, sem legenda "bem-vindo" pra não ocupar espaço à toa. */}
-      <div className="bg-primary py-4 px-4 rounded-b-2xl shadow-md text-white">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">{user?.name?.split(' ')[0]}</h1>
-          <Link to="/profile" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm overflow-hidden border-2 border-white/30">
-            {user?.photo_url ? (
-              <img src={user.photo_url} alt="Perfil" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-lg font-bold">{user?.name?.charAt(0)}</span>
-            )}
-          </Link>
-        </div>
-      </div>
-
-      <div className="px-4 mt-6 space-y-8">
+      {/* Sem cabeçalho de "bem-vindo"/nome aqui — o Navbar já dá acesso ao perfil
+          (dropdown no desktop, aba "Perfil" no rodapé mobile); duplicar só
+          ocupava espaço no topo da home à toa. */}
+      <div className="px-4 pt-6 space-y-8">
         <BannerCarousel banners={clientBanners} />
 
         {/* Quick Actions */}
@@ -121,20 +107,13 @@ const ClientHome = () => {
           </Link>
         </div>
 
-        {/* Mobilidade elétrica está em alta — seções de destaque logo na entrada,
-            cada uma com foto grande e só os serviços de manutenção daquele veículo. */}
+        {/* Mobilidade elétrica está em alta — seção de destaque logo na entrada,
+            com foto grande e só os serviços de manutenção dela. */}
         <FeaturedServiceSection
           badge="Em alta"
-          title="iBike"
-          subtitle="Manutenção completa para a sua bike elétrica"
-          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
-          services={groupItems('iBike')}
-        />
-        <FeaturedServiceSection
-          badge="Novidade"
           title="Scooter Elétrica"
-          subtitle="Manutenção completa para o seu patinete elétrico"
-          image="https://images.unsplash.com/photo-1657008846502-e03a84f49baa?auto=format&fit=crop&w=900&q=75"
+          subtitle="Manutenção completa para a sua bike/scooter elétrica"
+          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
           services={groupItems('Scooter Elétrica')}
         />
 

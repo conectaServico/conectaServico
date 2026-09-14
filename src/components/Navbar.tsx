@@ -325,11 +325,6 @@ const Navbar = () => {
           
           {isAuthenticated ? (
              <div className="flex items-center gap-3">
-               {user?.role === 'client' && (
-                 <Link to="/request/new" className="bg-orange-500 text-white p-2 rounded-full">
-                   <Plus className="w-5 h-5" />
-                 </Link>
-               )}
                {user?.role === 'professional' && (
                  <Link to="/wallet" className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors cursor-pointer border border-blue-100 shadow-sm">
                    <div className="bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
