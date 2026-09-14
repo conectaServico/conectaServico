@@ -3,6 +3,7 @@ import {
   Smartphone,
   Hammer,
   Users,
+  Briefcase,
   type LucideIcon
 } from 'lucide-react';
 
@@ -33,17 +34,15 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
       { label: 'Construção', items: ['Pedreiro', 'Arquiteto', 'Azulejista', 'Limpeza Pós Obra', 'Engenheiro', 'Marmoraria e Granitos', 'Poço Artesiano', 'Remoção de Entulho', 'Telhadista', 'Impermeabilização', 'Design de Interiores'] },
       { label: 'Reformas e Reparos', items: ['Eletricista', 'Gesso e DryWall', 'Pintor', 'Vidraceiro', 'Serralheria e Solda', 'Encanador', 'Gás', 'Pavimentação'] },
       { label: 'Instalação', items: ['Segurança Eletrônica', 'Automação Residencial', 'Instalação de eletrônicos', 'Antenista', 'Toldos e Coberturas'] },
-      { label: 'Para a Casa', items: ['Decorador', 'Montador de Móveis', 'Marceneiro', 'Paisagista', 'Jardinagem', 'Piscina', 'Redes de Proteção', 'Coifas e Exaustores', 'Dedetização', 'Lavagem de sofá', 'Limpeza de caixa d’água'] },
-      { label: 'Serviços Gerais', items: ['Marido de aluguel', 'Fretes e mudanças', 'Instalador de câmeras', 'Segurança e alarmes', 'Aulas particulares'] },
+      { label: "Para a Casa", items: ["Decorador", "Montador de Móveis", "Marceneiro", "Paisagista", "Jardinagem", "Piscina", "Redes de Proteção", "Coifas e Exaustores", "Dedetização", "Lavagem de sofá", "Limpeza de caixa d'água"] },
     ],
     items: [
-      'Pedreiro', 'Arquiteto', 'Azulejista', 'Limpeza Pós Obra', 'Engenheiro', 'Marmoraria e Granitos', 'Poço Artesiano', 'Remoção de Entulho', 'Telhadista', 'Impermeabilização', 'Design de Interiores',
-      'Eletricista', 'Gesso e DryWall', 'Pintor', 'Vidraceiro', 'Serralheria e Solda', 'Encanador', 'Gás', 'Pavimentação',
-      'Segurança Eletrônica', 'Automação Residencial', 'Instalação de eletrônicos', 'Antenista', 'Toldos e Coberturas',
-      'Decorador', 'Montador de Móveis', 'Marceneiro', 'Paisagista', 'Jardinagem', 'Piscina', 'Redes de Proteção', 'Coifas e Exaustores', 'Dedetização', 'Lavagem de sofá', 'Limpeza de caixa d’água',
-      'Marido de aluguel', 'Fretes e mudanças', 'Instalador de câmeras', 'Segurança e alarmes', 'Aulas particulares',
+      "Pedreiro", "Arquiteto", "Azulejista", "Limpeza Pós Obra", "Engenheiro", "Marmoraria e Granitos", "Poço Artesiano", "Remoção de Entulho", "Telhadista", "Impermeabilização", "Design de Interiores",
+      "Eletricista", "Gesso e DryWall", "Pintor", "Vidraceiro", "Serralheria e Solda", "Encanador", "Gás", "Pavimentação",
+      "Segurança Eletrônica", "Automação Residencial", "Instalação de eletrônicos", "Antenista", "Toldos e Coberturas",
+      "Decorador", "Montador de Móveis", "Marceneiro", "Paisagista", "Jardinagem", "Piscina", "Redes de Proteção", "Coifas e Exaustores", "Dedetização", "Lavagem de sofá", "Limpeza de caixa d'água",
     ],
-    image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80'
+    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80"
   },
   {
     name: 'Serviços domésticos',
@@ -53,11 +52,11 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
     // GetNinjas — `items` é a união usada nos lugares que não têm abas (fileira
     // da home, grade de subcategoria do "novo pedido").
     groups: [
-      { label: 'Para Casa', items: ['Diarista', 'Limpeza de Piscina', 'Passadeira', 'Personal Shopper', 'Lavadeira'] },
+      { label: 'Para Casa', items: ['Diarista', 'Limpeza de Piscina', 'Lavadeira e Passadeira', 'Personal Shopper'] },
       { label: 'Para Família', items: ['Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular'] },
       { label: 'Para Pets', items: ['Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'] },
     ],
-    items: ['Diarista', 'Limpeza de Piscina', 'Passadeira', 'Personal Shopper', 'Lavadeira', 'Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular', 'Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'],
+    items: ['Diarista', 'Limpeza de Piscina', 'Lavadeira e Passadeira', 'Personal Shopper', 'Babá', 'Cozinheira', 'Motorista', 'Personal Organizer', 'Entregador', 'Segurança Particular', 'Adestrador de Cães', 'Passeador de Cães', 'Serviços para Pets'],
     // Capa da categoria = foto da Diarista (serviço mais comum do grupo) — antes
     // estava com a foto de bebê da Babá, que não representa "Serviços domésticos".
     image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80'
@@ -75,6 +74,15 @@ export const CATEGORY_MENUS: CategoryMenu[] = [
     icon: Smartphone,
     items: ['Desenvolvedor de sites', 'Designer gráfico', 'Marketing digital', 'Edição de vídeo'],
     image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    // Separado de "Reformas e Reparos" — marido de aluguel, frete e aulas
+    // particulares não são serviço de reforma/construção.
+    name: 'Serviços Gerais',
+    slug: 'servicos-gerais',
+    icon: Briefcase,
+    items: ['Marido de aluguel', 'Fretes e mudanças', 'Aulas particulares'],
+    image: 'https://images.unsplash.com/photo-1426927308491-6380b6a9936f?auto=format&fit=crop&w=800&q=80'
   }
 ];
 
@@ -111,7 +119,7 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Poço Artesiano': 'https://images.unsplash.com/photo-1673870861507-d72aa6855d89?auto=format&fit=crop&w=400&q=70',
   'Remoção de Entulho': 'https://images.unsplash.com/photo-1777793919680-0123bc31ce36?auto=format&fit=crop&w=400&q=70',
   'Telhadista': 'https://images.unsplash.com/photo-1763665814538-8ba04597286c?auto=format&fit=crop&w=400&q=70',
-  'Impermeabilização': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=70',
+  'Impermeabilização': 'https://images.unsplash.com/photo-1726589004565-bedfba94d3a2?auto=format&fit=crop&w=400&q=70',
   'Design de Interiores': 'https://images.unsplash.com/photo-1664711942326-2c3351e215e6?auto=format&fit=crop&w=400&q=70',
   // Reformas e Reparos — aba "Reformas e Reparos"
   'Eletricista': 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=400&q=70',
@@ -125,7 +133,7 @@ export const SERVICE_IMAGES: Record<string, string> = {
   // Reformas e Reparos — Instalação
   'Segurança Eletrônica': 'https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&q=70',
   'Automação Residencial': 'https://images.unsplash.com/photo-1707733260992-73ff6dbed163?auto=format&fit=crop&w=400&q=70',
-  'Instalação de eletrônicos': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=70',
+  'Instalação de eletrônicos': 'https://images.unsplash.com/photo-1635788798247-92a15f830a3b?auto=format&fit=crop&w=400&q=70',
   'Antenista': 'https://images.unsplash.com/photo-1761795111868-4851b056cf63?auto=format&fit=crop&w=400&q=70',
   'Toldos e Coberturas': 'https://images.unsplash.com/photo-1741971282313-fb25835b1d24?auto=format&fit=crop&w=400&q=70',
   // Reformas e Reparos — Para a Casa
@@ -140,20 +148,17 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Dedetização': 'https://images.unsplash.com/photo-1611773236409-f3ee161007a1?auto=format&fit=crop&w=400&q=70',
   'Lavagem de sofá': 'https://images.unsplash.com/photo-1567016432779-094069958ea5?auto=format&fit=crop&w=400&q=70',
   'Limpeza de caixa d’água': 'https://images.unsplash.com/photo-1778178933409-705e5a5c6a48?auto=format&fit=crop&w=400&q=70',
-  // Reformas e Reparos — Serviços Gerais
+  // Serviços Gerais
   'Marido de aluguel': 'https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=400&q=70',
   'Fretes e mudanças': 'https://images.unsplash.com/photo-1600518464441-9154a4dea21b?auto=format&fit=crop&w=400&q=70',
-  'Instalador de câmeras': 'https://images.unsplash.com/photo-1676630656246-3047520adfdf?auto=format&fit=crop&w=400&q=70',
-  'Segurança e alarmes': 'https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&q=70',
   'Aulas particulares': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=400&q=70',
   // Serviços domésticos
   'Diarista': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=70',
   'Babá': 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=400&q=70',
   'Cozinheira': 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=400&q=70',
-  'Limpeza de Piscina': 'https://images.unsplash.com/photo-1745570295714-cb18cd15ff64?auto=format&fit=crop&w=400&q=70',
-  'Passadeira': 'https://images.unsplash.com/photo-1647202152259-98fe50ad0618?auto=format&fit=crop&w=400&q=70',
+  'Limpeza de Piscina': 'https://images.unsplash.com/photo-1509577330292-0532d33c053e?auto=format&fit=crop&w=400&q=70',
+  'Lavadeira e Passadeira': 'https://images.unsplash.com/photo-1647202152259-98fe50ad0618?auto=format&fit=crop&w=400&q=70',
   'Personal Shopper': 'https://images.unsplash.com/photo-1760565030786-91526dff426c?auto=format&fit=crop&w=400&q=70',
-  'Lavadeira': 'https://images.unsplash.com/photo-1577553697116-6ee9a4ba564b?auto=format&fit=crop&w=400&q=70',
   'Motorista': 'https://images.unsplash.com/photo-1761599933861-fddf8f791c0a?auto=format&fit=crop&w=400&q=70',
   'Personal Organizer': 'https://images.unsplash.com/photo-1650229068182-6931ccb389c2?auto=format&fit=crop&w=400&q=70',
   'Entregador': 'https://images.unsplash.com/photo-1543499459-d1460946bdc6?auto=format&fit=crop&w=400&q=70',
@@ -192,21 +197,26 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   // Reformas e Reparos — Construção
   'Pedreiro': ['Reforma', 'Construção nova', 'Reparo', 'Acabamento', 'Outro'],
   'Arquiteto': ['Projeto novo', 'Reforma/ampliação', 'Regularização', 'Outro'],
+  'Azulejista': ['Piso', 'Revestimento de parede', 'Banheiro/cozinha completo', 'Reparo', 'Outro'],
+  'Limpeza Pós Obra': ['Apartamento', 'Casa', 'Comercial', 'Outro'],
   'Engenheiro': ['Laudo técnico', 'Projeto estrutural', 'Acompanhamento de obra', 'Outro'],
   'Marmoraria e Granitos': ['Bancada nova', 'Reparo', 'Outro'],
   'Poço Artesiano': ['Perfuração', 'Manutenção', 'Outro'],
   'Remoção de Entulho': ['Caçamba avulsa', 'Remoção recorrente', 'Outro'],
+  'Telhadista': ['Telhado novo', 'Reparo/vazamento', 'Manutenção', 'Outro'],
+  'Impermeabilização': ['Laje/terraço', 'Banheiro', 'Piscina', 'Outro'],
   'Design de Interiores': ['Projeto completo', 'Consultoria', 'Outro'],
   // Reformas e Reparos — aba "Reformas e Reparos"
   'Pintor': ['Pintura interna', 'Pintura externa', 'Textura/grafiato', 'Retoque', 'Outro'],
   'Encanador': ['Vazamento', 'Entupimento', 'Instalação', 'Troca de peças (torneira, registro...)', 'Outro'],
   'Eletricista': ['Instalação', 'Conserto ou manutenção', 'Fiação elétrica', 'Instalação de ar condicionado', 'Instalação de ventilador de teto', 'Certificado de instalação', 'Outro'],
   'Gesso e DryWall': ['Instalação', 'Reparo', 'Forro/sanca', 'Outro'],
+  'Vidraceiro': ['Janela/porta de vidro', 'Box de banheiro', 'Espelho', 'Reparo', 'Outro'],
   'Serralheria e Solda': ['Portão/grade', 'Solda estrutural', 'Reparo', 'Outro'],
   'Gás': ['Instalação', 'Manutenção', 'Vazamento', 'Outro'],
   'Pavimentação': ['Calçada', 'Piso intertravado', 'Asfalto', 'Outro'],
   // Reformas e Reparos — Instalação
-  'Segurança Eletrônica': ['Instalação', 'Manutenção', 'Outro'],
+  'Segurança Eletrônica': ['Instalação de câmeras', 'Instalação de alarme', 'Cerca elétrica', 'Manutenção', 'Outro'],
   'Automação Residencial': ['Iluminação inteligente', 'Fechadura/portão', 'Som ambiente', 'Projeto completo'],
   'Instalação de eletrônicos': ['TV/Home theater', 'Rede/Wi-Fi', 'Outro'],
   'Antenista': ['Instalação', 'Ajuste de sinal', 'Manutenção', 'Outro'],
@@ -214,20 +224,24 @@ const SERVICE_TYPE_OPTIONS: Record<string, string[]> = {
   // Reformas e Reparos — Para a Casa
   'Montador de Móveis': ['Móveis planejados', 'Móveis de loja (MDF)', 'Desmontagem', 'Outro'],
   'Decorador': ['Consultoria de decoração', 'Projeto completo', 'Outro'],
+  'Marceneiro': ['Móveis planejados', 'Móveis sob medida', 'Reparo', 'Outro'],
   'Paisagista': ['Projeto de jardim', 'Paisagismo completo', 'Outro'],
   'Jardinagem': ['Manutenção regular', 'Poda', 'Paisagismo', 'Outro'],
   'Piscina': ['Limpeza/manutenção', 'Tratamento químico', 'Reparo', 'Outro'],
   'Redes de Proteção': ['Janela', 'Sacada', 'Área de lazer', 'Outro'],
   'Coifas e Exaustores': ['Instalação', 'Manutenção/limpeza', 'Conserto', 'Outro'],
-  // Reformas e Reparos — Serviços Gerais
+  'Dedetização': ['Baratas/insetos', 'Roedores', 'Cupins', 'Outro'],
+  'Lavagem de sofá': ['Sofá de tecido', 'Sofá de couro', 'Colchão', 'Tapete', 'Outro'],
+  'Limpeza de caixa d’água': ['Residencial', 'Comercial/predial', 'Outro'],
+  // Serviços Gerais
   'Marido de aluguel': ['Pequenos reparos', 'Instalação', 'Montagem', 'Manutenção geral', 'Outro'],
   'Fretes e mudanças': ['Mudança residencial', 'Frete de item único', 'Mudança comercial', 'Outro'],
+  'Aulas particulares': ['Reforço escolar', 'Idiomas', 'Música', 'Vestibular/Enem', 'Outro'],
   // Serviços domésticos — Para Casa
   'Diarista': ['Limpeza única', 'Semanal', 'Quinzenal', 'Mensal'],
   'Limpeza de Piscina': ['Limpeza/manutenção', 'Tratamento químico', 'Reparo', 'Outro'],
-  'Passadeira': ['Eventual', 'Semanal', 'Quinzenal', 'Mensal'],
+  'Lavadeira e Passadeira': ['Eventual', 'Semanal', 'Quinzenal', 'Mensal'],
   'Personal Shopper': ['Compras do dia a dia', 'Compras especiais/presentes', 'Consultoria de estilo', 'Outro'],
-  'Lavadeira': ['Eventual', 'Semanal', 'Quinzenal', 'Mensal'],
   // Serviços domésticos — Para Família
   'Babá': ['Eventual', 'Fixo (diário)', 'Período integral', 'Meio período'],
   'Cozinheira': ['Evento único', 'Refeições da semana', 'Fixo (diário)'],
@@ -259,6 +273,7 @@ const DESCRIPTION_PLACEHOLDERS: Record<string, string> = {
   'Assistência técnica': 'Ex: Meu ar condicionado não está gelando e faz um ruído estranho ao ligar. Preciso de uma avaliação e do conserto o quanto antes...',
   'Design e Tecnologia': 'Ex: Preciso de um site institucional com 5 páginas pra minha empresa, com formulário de contato e integração com WhatsApp...',
   'Serviços domésticos': 'Ex: Preciso de uma diarista quinzenal pra limpeza geral de um apartamento de 2 quartos, incluindo cozinha e banheiros...',
+  'Serviços Gerais': 'Ex: Preciso de alguém pra montar um guarda-roupa e trocar uma torneira que está pingando, tudo no mesmo dia...',
 };
 const DEFAULT_DESCRIPTION_PLACEHOLDER = 'Ex: Descreva o que precisa, com detalhes como medidas, prazos e preferências que ajudem o profissional a entender o serviço...';
 

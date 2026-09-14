@@ -204,7 +204,7 @@ const NewJob = () => {
   const needsMaterials = category === 'Reformas e Reparos';
   // Serviços que dependem de agenda (diarista, marido de aluguel, frete...)
   // perguntam quando o cliente pode receber o profissional.
-  const needsAvailability = ['Reformas e Reparos', 'Serviços domésticos'].includes(category);
+  const needsAvailability = ['Reformas e Reparos', 'Serviços domésticos', 'Serviços Gerais'].includes(category);
 
   // Se o cliente já veio com um serviço específico escolhido (ex.: clicou
   // numa subcategoria na Home ou na página da categoria), a tela de "qual
