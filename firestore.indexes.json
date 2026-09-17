@@ -143,6 +143,15 @@
         { "fieldPath": "professionalId", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" },
+        { "fieldPath": "diamonds", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

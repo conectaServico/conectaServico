@@ -146,10 +146,22 @@ export interface AdminUserHit {
   coinsBalance: number;
   created_at: number;
 }
-/** Busca usuário pra suporte: e-mail exato ou prefixo do nome (case-sensitive). */
+/** Busca usuário pra suporte: e-mail exato ou nome (via searchTokens, sem distinguir acento/maiúscula). */
 export const adminSearchUsersFn = httpsCallable<{ query: string }, { results: AdminUserHit[] }>(
   functions,
   'adminSearchUsers'
+);
+
+/** Lista todos os clientes ou todos os profissionais, paginado por created_at desc. */
+export const adminListUsersFn = httpsCallable<
+  { role: 'client' | 'professional'; cursorCreatedAt?: number | null },
+  { results: AdminUserHit[]; nextCursor: number | null }
+>(functions, 'adminListUsers');
+
+/** Dá (amount > 0) ou desconta (amount < 0) diamantes de uma conta na mão, com motivo opcional. */
+export const adminAdjustDiamondsFn = httpsCallable<{ userId: string; amount: number; reason?: string }, { ok: boolean }>(
+  functions,
+  'adminAdjustDiamonds'
 );
 
 export interface AdminUserDetail {

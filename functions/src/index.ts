@@ -860,45 +860,124 @@ export const getAdminCharts = onCall(wrapCallable(async (req) => {
 }));
 
 // ---------------------------------------------------------------------------
-// 8.3 Suporte: localizar usuário (por e-mail exato ou prefixo do nome) e
-// puxar um retrato rápido da conta (pedidos/propostas/transações/pagamentos
-// recentes) pra atender reclamação sem precisar abrir o Firestore console.
+// 8.3 Suporte: localizar usuário (por e-mail exato ou nome) e puxar um
+// retrato rápido da conta (pedidos/propostas/transações/pagamentos recentes)
+// pra atender reclamação sem precisar abrir o Firestore console.
 // ---------------------------------------------------------------------------
+type AdminUserHitInternal = { id: string; name: string; email: string; role: string; verified: boolean; coinsBalance: number; created_at: number };
+const toAdminHit = (id: string, d: FirebaseFirestore.DocumentData): AdminUserHitInternal => ({
+  id,
+  name: d.name || '',
+  email: d.email || '',
+  role: d.role || '',
+  verified: !!d.verified,
+  coinsBalance: d.coinsBalance || 0,
+  created_at: d.created_at || 0,
+});
+
+/** Tokens da busca — mesma normalização de `buildSearchTokens` (sem os prefixos, só as palavras). */
+function queryTokensLocal(q: string): string[] {
+  return q
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !SEARCH_STOPWORDS.has(w))
+    .slice(0, 10);
+}
+
 export const adminSearchUsers = onCall(wrapCallable(async (req) => {
   assertAdmin(req);
   const term = String(req.data?.query || '').trim();
   if (term.length < 2) throw new HttpsError('invalid-argument', 'Digite pelo menos 2 caracteres.');
 
-  type Hit = { id: string; name: string; email: string; role: string; verified: boolean; coinsBalance: number; created_at: number };
-  const toHit = (id: string, d: FirebaseFirestore.DocumentData): Hit => ({
-    id,
-    name: d.name || '',
-    email: d.email || '',
-    role: d.role || '',
-    verified: !!d.verified,
-    coinsBalance: d.coinsBalance || 0,
-    created_at: d.created_at || 0,
-  });
-
   if (term.includes('@')) {
     try {
       const authUser = await admin.auth().getUserByEmail(term.toLowerCase());
       const snap = await db.doc(`users/${authUser.uid}`).get();
-      return { results: snap.exists ? [toHit(snap.id, snap.data()!)] : [] };
+      return { results: snap.exists ? [toAdminHit(snap.id, snap.data()!)] : [] };
     } catch {
       return { results: [] }; // getUserByEmail joga se não achar — sem conta com esse e-mail
     }
   }
 
-  // Prefixo do nome tal como foi salvo (case-sensitive — mesma limitação de
-  // qualquer range query do Firestore; não é full-text search).
-  const snap = await db.collection('users')
-    .orderBy('name')
-    .startAt(term)
-    .endAt(term + '')
+  // Via publicProfiles.searchTokens (já normalizado sem acento/maiúscula, o
+  // mesmo índice usado na busca de profissionais/pedidos) — "josé", "JOSE" e
+  // "Jose" todos acham "José", diferente de uma range query direto em
+  // users.name (case-sensitive, só pegava prefixo exato).
+  const qTokens = queryTokensLocal(term);
+  if (qTokens.length === 0) return { results: [] };
+  const pubSnap = await db.collection('publicProfiles')
+    .where('searchTokens', 'array-contains-any', qTokens)
     .limit(10)
     .get();
-  return { results: snap.docs.map((d) => toHit(d.id, d.data())) };
+  if (pubSnap.empty) return { results: [] };
+  const userDocs = await db.getAll(...pubSnap.docs.map((d) => db.doc(`users/${d.id}`)));
+  return { results: userDocs.filter((d) => d.exists).map((d) => toAdminHit(d.id, d.data()!)) };
+}));
+
+// ---------------------------------------------------------------------------
+// 8.4 Suporte: listar todos os clientes ou todos os profissionais, paginado
+// — pra usuária navegar a base inteira em vez de só buscar um por um.
+// ---------------------------------------------------------------------------
+const ADMIN_LIST_PAGE_SIZE = 30;
+
+export const adminListUsers = onCall(wrapCallable(async (req) => {
+  assertAdmin(req);
+  const role = String(req.data?.role || '');
+  if (role !== 'client' && role !== 'professional') {
+    throw new HttpsError('invalid-argument', 'role deve ser "client" ou "professional".');
+  }
+  const cursor = typeof req.data?.cursorCreatedAt === 'number' ? req.data.cursorCreatedAt : null;
+
+  let q = db.collection('users').where('role', '==', role).orderBy('created_at', 'desc');
+  if (cursor !== null) q = q.startAfter(cursor);
+  const snap = await q.limit(ADMIN_LIST_PAGE_SIZE).get();
+
+  return {
+    results: snap.docs.map((d) => toAdminHit(d.id, d.data())),
+    nextCursor: snap.docs.length === ADMIN_LIST_PAGE_SIZE ? snap.docs[snap.docs.length - 1].data().created_at : null,
+  };
+}));
+
+// ---------------------------------------------------------------------------
+// 8.5 Suporte: dar (ou descontar) diamantes de uma conta na mão, com motivo —
+// pra resolver reclamação direto do "perfil" do usuário no admin.
+// ---------------------------------------------------------------------------
+export const adminAdjustDiamonds = onCall(wrapCallable(async (req) => {
+  const adminUid = assertAdmin(req);
+  const userId = String(req.data?.userId || '').trim();
+  const amount = Math.trunc(Number(req.data?.amount));
+  const reason = String(req.data?.reason || '').trim().slice(0, 300);
+  if (!userId || !Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 100000) {
+    throw new HttpsError('invalid-argument', 'Informe o usuário e uma quantidade válida (até 100000).');
+  }
+
+  const userRef = db.doc(`users/${userId}`);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+
+  await db.runTransaction(async (tx) => {
+    tx.update(userRef, { coinsBalance: FieldValue.increment(amount) });
+    tx.set(db.collection('transactions').doc(), {
+      userId,
+      amount,
+      type: 'ADJUSTMENT',
+      description: reason || `Ajuste manual pelo admin (${amount > 0 ? '+' : ''}${amount} 💎)`,
+      created_at: Date.now(),
+    });
+  });
+
+  await notify(userId, {
+    type: 'support',
+    title: amount > 0 ? 'Você recebeu diamantes' : 'Ajuste na sua carteira',
+    body: reason || `${amount > 0 ? '+' : ''}${amount} 💎 na sua conta.`,
+    link: '/wallet',
+  }).catch(() => undefined);
+
+  console.log(`adminAdjustDiamonds: admin ${adminUid} ajustou ${amount} para ${userId} — ${reason}`);
+  return { ok: true };
 }));
 
 export const adminGetUserDetail = onCall(wrapCallable(async (req) => {
