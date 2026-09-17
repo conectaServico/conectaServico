@@ -122,6 +122,51 @@ export interface AdminStats {
 }
 export const getAdminStatsFn = httpsCallable<Record<string, never>, AdminStats>(functions, 'getAdminStats');
 
+export interface AdminCharts {
+  days: string[]; // 'YYYY-MM-DD', últimos 14 dias em ordem crescente
+  newClientsByDay: Record<string, number>;
+  newProfessionalsByDay: Record<string, number>;
+  revenueByDay: Record<string, number>;
+  topProfessionals: Array<{
+    userId: string;
+    name: string;
+    email: string;
+    totalBRL: number;
+    paymentsCount: number;
+  }>;
+}
+export const getAdminChartsFn = httpsCallable<Record<string, never>, AdminCharts>(functions, 'getAdminCharts');
+
+export interface AdminUserHit {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  verified: boolean;
+  coinsBalance: number;
+  created_at: number;
+}
+/** Busca usuário pra suporte: e-mail exato ou prefixo do nome (case-sensitive). */
+export const adminSearchUsersFn = httpsCallable<{ query: string }, { results: AdminUserHit[] }>(
+  functions,
+  'adminSearchUsers'
+);
+
+export interface AdminUserDetail {
+  user: Record<string, unknown> & { id: string };
+  recentRequests: Record<string, unknown>[];
+  recentProposals: Record<string, unknown>[];
+  recentTransactions: Record<string, unknown>[];
+  recentPayments: Record<string, unknown>[];
+  recentTickets: Record<string, unknown>[];
+  validation: Record<string, unknown> | null;
+}
+/** Retrato completo de uma conta (pedidos/propostas/transações/pagamentos/chamados recentes) pra atender suporte. */
+export const adminGetUserDetailFn = httpsCallable<{ userId: string }, AdminUserDetail>(
+  functions,
+  'adminGetUserDetail'
+);
+
 /** Exclui a própria conta (LGPD). Apaga perfil, KYC, arquivos e anúncios; encerra o login. */
 export const deleteMyAccountFn = httpsCallable<Record<string, never>, { ok: boolean }>(
   functions,

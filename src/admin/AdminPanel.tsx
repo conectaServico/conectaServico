@@ -1,10 +1,44 @@
 import { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import { reviewValidationFn, resolveSupportTicketFn, callableErrorMessage, getAdminStatsFn, type AdminStats } from '@/services/api';
-import { ShieldCheck, CheckCircle, XCircle, FileImage, Loader2, LifeBuoy, Link2, Users, Wrench, ClipboardList, Coins, AlertTriangle, Bug, BadgeCheck, UserPlus } from 'lucide-react';
+import {
+  reviewValidationFn,
+  resolveSupportTicketFn,
+  callableErrorMessage,
+  getAdminStatsFn,
+  getAdminChartsFn,
+  adminSearchUsersFn,
+  adminGetUserDetailFn,
+  type AdminStats,
+  type AdminCharts,
+  type AdminUserHit,
+  type AdminUserDetail,
+} from '@/services/api';
+import { ShieldCheck, CheckCircle, XCircle, FileImage, Loader2, LifeBuoy, Link2, Users, Wrench, ClipboardList, Coins, AlertTriangle, Bug, BadgeCheck, UserPlus, Search, X } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 import toast from 'react-hot-toast';
 import { SupportTicket } from '@/types';
+
+// Mesmas cores da marca (src/index.css) — azul = clientes/receita, laranja =
+// profissionais. É o par categórico já usado em todo o app, validado pro
+// gráfico (CVD ΔE 32.8, normal-vision ΔE 41.5 — folgado nos dois).
+const COLOR_BLUE = '#2563EB';
+const COLOR_ORANGE = '#F97316';
+
+const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const shortDay = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+// Espelha CHART_DAYS de functions/src/index.ts — só pro texto "últimos N dias".
+const CHART_DAYS_LABEL = 14;
 
 interface ClientErrorLog {
   id: string;
@@ -68,6 +102,18 @@ const AdminPanel = () => {
   const [statsError, setStatsError] = useState('');
   const [statsLoading, setStatsLoading] = useState(true);
   const [errorLogs, setErrorLogs] = useState<ClientErrorLog[]>([]);
+  const [charts, setCharts] = useState<AdminCharts | null>(null);
+  const [chartsError, setChartsError] = useState('');
+  const [chartsLoading, setChartsLoading] = useState(true);
+
+  // Busca de usuário pra suporte — nome/e-mail -> lista de resultados -> abre
+  // o retrato completo de um deles.
+  const [userSearch, setUserSearch] = useState('');
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [userSearchError, setUserSearchError] = useState('');
+  const [userHits, setUserHits] = useState<AdminUserHit[]>([]);
+  const [userDetail, setUserDetail] = useState<AdminUserDetail | null>(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
 
   const fetchAll = async () => {
     try {
@@ -106,10 +152,53 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchCharts = async () => {
+    setChartsLoading(true);
+    setChartsError('');
+    try {
+      const res = await getAdminChartsFn();
+      setCharts(res.data);
+    } catch (err) {
+      setChartsError(callableErrorMessage(err, 'Erro ao carregar os gráficos.'));
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAll();
     fetchStats();
+    fetchCharts();
   }, []);
+
+  const handleUserSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userSearch.trim().length < 2) return;
+    setUserSearchLoading(true);
+    setUserSearchError('');
+    setUserDetail(null);
+    try {
+      const res = await adminSearchUsersFn({ query: userSearch.trim() });
+      setUserHits(res.data.results);
+      if (res.data.results.length === 0) setUserSearchError('Nenhum usuário encontrado.');
+    } catch (err) {
+      setUserSearchError(callableErrorMessage(err, 'Erro ao buscar usuário.'));
+    } finally {
+      setUserSearchLoading(false);
+    }
+  };
+
+  const openUserDetail = async (userId: string) => {
+    setUserDetailLoading(true);
+    try {
+      const res = await adminGetUserDetailFn({ userId });
+      setUserDetail(res.data);
+    } catch (err) {
+      toast.error(callableErrorMessage(err, 'Erro ao carregar a conta.'));
+    } finally {
+      setUserDetailLoading(false);
+    }
+  };
 
   const handleKyc = async (userId: string, decision: 'approved' | 'rejected') => {
     try {
@@ -242,6 +331,96 @@ CPF ({requests.filter((r) => r.status === 'pending').length})
               </div>
             </>
           ) : null}
+
+          {/* Gráficos — período fixo dos últimos 14 dias. Consulta separada
+              das métricas rápidas de cima porque lê documentos, não só
+              contadores. */}
+          {chartsLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            </div>
+          ) : chartsError ? (
+            <div className="bg-danger/10 text-danger p-4 rounded-xl text-sm font-medium flex items-center justify-between gap-3">
+              {chartsError}
+              <button onClick={fetchCharts} className="font-bold underline flex-shrink-0">Tentar de novo</button>
+            </div>
+          ) : charts ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-bold text-slate-800">Novos usuários por dia</h3>
+                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: COLOR_BLUE }} />Clientes</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: COLOR_ORANGE }} />Profissionais</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">Últimos {CHART_DAYS_LABEL} dias</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={charts.days.map((d) => ({
+                      day: shortDay(d),
+                      clientes: charts.newClientsByDay[d] || 0,
+                      profissionais: charts.newProfessionalsByDay[d] || 0,
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e1e0d9" vertical={false} />
+                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#898781' }} axisLine={{ stroke: '#c3c2b7' }} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#898781' }} axisLine={false} tickLine={false} width={28} />
+                      <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} labelFormatter={(v) => `Dia ${v}`} />
+                      <Line type="monotone" dataKey="clientes" name="Clientes" stroke={COLOR_BLUE} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="profissionais" name="Profissionais" stroke={COLOR_ORANGE} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                  <h3 className="text-sm font-bold text-slate-800 mb-1">Faturamento por dia</h3>
+                  <p className="text-xs text-slate-400 mb-3">Pagamentos aprovados · últimos {CHART_DAYS_LABEL} dias</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={charts.days.map((d) => ({ day: shortDay(d), receita: charts.revenueByDay[d] || 0 }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e1e0d9" vertical={false} />
+                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#898781' }} axisLine={{ stroke: '#c3c2b7' }} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#898781' }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `R$${v}`} />
+                      <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v) => [BRL(Number(v) || 0), 'Receita']} labelFormatter={(v) => `Dia ${v}`} />
+                      <Bar dataKey="receita" name="Receita" fill={COLOR_BLUE} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <h3 className="text-sm font-bold text-slate-800 mb-1">Top profissionais por faturamento</h3>
+                <p className="text-xs text-slate-400 mb-3">Pagamentos aprovados · últimos {CHART_DAYS_LABEL} dias</p>
+                {charts.topProfessionals.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-6">Nenhuma compra de diamantes no período.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(160, charts.topProfessionals.length * 40)}>
+                    <BarChart
+                      data={charts.topProfessionals.map((p) => ({ name: p.name, faturamento: p.totalBRL, email: p.email }))}
+                      layout="vertical"
+                      margin={{ left: 8, right: 24 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e1e0d9" horizontal={false} />
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        tick={{ fontSize: 12, fill: '#52514e' }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={140}
+                      />
+                      <Tooltip
+                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                        formatter={(v) => [BRL(Number(v) || 0), 'Faturamento']}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.email || ''}
+                      />
+                      <Bar dataKey="faturamento" fill={COLOR_BLUE} radius={[0, 4, 4, 0]} maxBarSize={22} label={{ position: 'right', fontSize: 11, fill: '#52514e', formatter: (v: unknown) => BRL(Number(v) || 0) }} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -331,6 +510,169 @@ CPF ({requests.filter((r) => r.status === 'pending').length})
       )}
 
       {tab === 'support' && (
+        <div className="space-y-6">
+          {/* Buscar usuário — retrato rápido da conta pra atender reclamação
+              sem precisar abrir o Firestore console. */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <Search className="w-4 h-4" /> Buscar usuário
+            </h3>
+            <form onSubmit={handleUserSearch} className="flex gap-2">
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="E-mail exato ou início do nome…"
+                className="flex-1 px-3 py-2.5 text-sm border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                type="submit"
+                disabled={userSearchLoading || userSearch.trim().length < 2}
+                className="px-4 py-2.5 bg-primary text-white text-sm font-bold rounded-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                {userSearchLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Buscar
+              </button>
+            </form>
+            {userSearchError && <p className="text-sm text-danger mt-2 font-medium">{userSearchError}</p>}
+
+            {userHits.length > 0 && !userDetail && (
+              <div className="mt-3 divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                {userHits.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => openUserDetail(u.id)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">
+                        {u.name} <span className="font-normal text-slate-400">· {u.role === 'client' ? 'cliente' : 'profissional'}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400 flex-shrink-0">{u.coinsBalance} 💎</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {userDetailLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
+            )}
+
+            {userDetail && !userDetailLoading && (() => {
+              const u = userDetail.user;
+              const isClient = u.role === 'client';
+              return (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <h4 className="font-bold text-slate-900">{String(u.name || '—')}</h4>
+                      <p className="text-sm text-slate-500">{String(u.email || '—')} · {String(u.phone || '—')}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          {isClient ? 'Cliente' : 'Profissional'}
+                        </span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${u.verified ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-700'}`}>
+                          {u.verified ? 'Verificado' : 'Não verificado'}
+                        </span>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          {Number(u.coinsBalance || 0)} 💎
+                        </span>
+                        {typeof u.rating === 'number' && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            ★ {(u.rating as number).toFixed(1)} ({Number(u.reviewCount || 0)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setUserDetail(null); setUserHits([]); setUserSearch(''); }}
+                      className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 flex-shrink-0"
+                      aria-label="Fechar"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                        {isClient ? 'Pedidos recentes' : 'Propostas recentes'}
+                      </p>
+                      {(isClient ? userDetail.recentRequests : userDetail.recentProposals).length === 0 ? (
+                        <p className="text-xs text-slate-400">Nada por aqui.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {(isClient ? userDetail.recentRequests : userDetail.recentProposals).map((r) => (
+                            <li key={String(r.id)} className="text-xs text-slate-600 flex items-center justify-between gap-2">
+                              <span className="truncate">{isClient ? String(r.subcategory || r.category) : `Proposta · R$ ${r.estimatedPrice}`}</span>
+                              <span className="text-slate-400 flex-shrink-0">{String(r.status)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Pagamentos recentes</p>
+                      {userDetail.recentPayments.length === 0 ? (
+                        <p className="text-xs text-slate-400">Nenhum pagamento.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {userDetail.recentPayments.map((p) => (
+                            <li key={String(p.id)} className="text-xs text-slate-600 flex items-center justify-between gap-2">
+                              <span>{BRL(Number(p.amount || 0))} · {Number(p.diamonds || 0)} 💎</span>
+                              <span className="text-slate-400 flex-shrink-0">{String(p.status)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Transações (💎)</p>
+                      {userDetail.recentTransactions.length === 0 ? (
+                        <p className="text-xs text-slate-400">Nenhuma transação.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {userDetail.recentTransactions.map((t) => (
+                            <li key={String(t.id)} className="text-xs text-slate-600 flex items-center justify-between gap-2">
+                              <span className="truncate">{String(t.description)}</span>
+                              <span className={`flex-shrink-0 font-bold ${Number(t.amount) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {Number(t.amount) >= 0 ? '+' : ''}{String(t.amount)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Chamados de suporte</p>
+                      {userDetail.recentTickets.length === 0 ? (
+                        <p className="text-xs text-slate-400">Nenhum chamado.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {userDetail.recentTickets.map((t) => (
+                            <li key={String(t.id)} className="text-xs text-slate-600 flex items-center justify-between gap-2">
+                              <span className="truncate">{String(t.subject)}</span>
+                              <span className="text-slate-400 flex-shrink-0">{String(t.status)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           {tickets.length === 0 ? (
             <div className="p-8 text-center text-slate-500 font-medium">Nenhum chamado.</div>
@@ -404,6 +746,7 @@ CPF ({requests.filter((r) => r.status === 'pending').length})
               ))}
             </div>
           )}
+        </div>
         </div>
       )}
     </div>

@@ -787,6 +787,154 @@ export const getAdminStats = onCall({ secrets: [MP_ACCESS_TOKEN] }, wrapCallable
 }));
 
 // ---------------------------------------------------------------------------
+// 8.2 Painel admin: gráficos (crescimento diário de 14 dias, receita diária,
+// ranking de profissionais por faturamento no período). Separado do
+// getAdminStats porque lê documentos (não só aggregate queries) — mais
+// pesado, então só roda quando a aba de gráficos é aberta.
+// ---------------------------------------------------------------------------
+const CHART_DAYS = 14;
+
+export const getAdminCharts = onCall(wrapCallable(async (req) => {
+  assertAdmin(req);
+
+  const since = Date.now() - CHART_DAYS * 24 * 60 * 60 * 1000;
+  const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+  const [clientsSnap, prosSnap, paymentsSnap] = await Promise.all([
+    db.collection('users').where('role', '==', 'client').where('created_at', '>=', since)
+      .select('created_at').get(),
+    db.collection('users').where('role', '==', 'professional').where('created_at', '>=', since)
+      .select('created_at').get(),
+    db.collection('payments').where('status', '==', 'approved').where('created_at', '>=', since)
+      .select('created_at', 'amount', 'userId').get(),
+  ]);
+
+  // Pré-monta os N últimos dias zerados, senão um dia sem cadastro/venda vira
+  // um buraco no gráfico em vez de uma barra em zero.
+  const days: string[] = [];
+  for (let i = CHART_DAYS - 1; i >= 0; i--) {
+    days.push(dayKey(Date.now() - i * 24 * 60 * 60 * 1000));
+  }
+  const newClientsByDay: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
+  const newProfessionalsByDay: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
+  const revenueByDay: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
+
+  clientsSnap.docs.forEach((d) => {
+    const k = dayKey(d.data().created_at);
+    if (k in newClientsByDay) newClientsByDay[k]++;
+  });
+  prosSnap.docs.forEach((d) => {
+    const k = dayKey(d.data().created_at);
+    if (k in newProfessionalsByDay) newProfessionalsByDay[k]++;
+  });
+
+  const revenueByProfessional = new Map<string, number>();
+  const paymentsByProfessional = new Map<string, number>();
+  paymentsSnap.docs.forEach((d) => {
+    const p = d.data() as { created_at: number; amount: number; userId: string };
+    const k = dayKey(p.created_at);
+    if (k in revenueByDay) revenueByDay[k] += p.amount || 0;
+    revenueByProfessional.set(p.userId, (revenueByProfessional.get(p.userId) || 0) + (p.amount || 0));
+    paymentsByProfessional.set(p.userId, (paymentsByProfessional.get(p.userId) || 0) + 1);
+  });
+
+  // Top 10 por faturamento no período — só busca o nome desses 10, não da
+  // coleção de usuários inteira.
+  const topIds = Array.from(revenueByProfessional.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([uid]) => uid);
+  const topDocs = topIds.length ? await db.getAll(...topIds.map((id) => db.doc(`users/${id}`))) : [];
+  const topProfessionals = topIds.map((uid, i) => {
+    const u = topDocs[i]?.data();
+    return {
+      userId: uid,
+      name: u?.name || 'Usuário removido',
+      email: u?.email || '',
+      totalBRL: revenueByProfessional.get(uid) || 0,
+      paymentsCount: paymentsByProfessional.get(uid) || 0,
+    };
+  });
+
+  return { days, newClientsByDay, newProfessionalsByDay, revenueByDay, topProfessionals };
+}));
+
+// ---------------------------------------------------------------------------
+// 8.3 Suporte: localizar usuário (por e-mail exato ou prefixo do nome) e
+// puxar um retrato rápido da conta (pedidos/propostas/transações/pagamentos
+// recentes) pra atender reclamação sem precisar abrir o Firestore console.
+// ---------------------------------------------------------------------------
+export const adminSearchUsers = onCall(wrapCallable(async (req) => {
+  assertAdmin(req);
+  const term = String(req.data?.query || '').trim();
+  if (term.length < 2) throw new HttpsError('invalid-argument', 'Digite pelo menos 2 caracteres.');
+
+  type Hit = { id: string; name: string; email: string; role: string; verified: boolean; coinsBalance: number; created_at: number };
+  const toHit = (id: string, d: FirebaseFirestore.DocumentData): Hit => ({
+    id,
+    name: d.name || '',
+    email: d.email || '',
+    role: d.role || '',
+    verified: !!d.verified,
+    coinsBalance: d.coinsBalance || 0,
+    created_at: d.created_at || 0,
+  });
+
+  if (term.includes('@')) {
+    try {
+      const authUser = await admin.auth().getUserByEmail(term.toLowerCase());
+      const snap = await db.doc(`users/${authUser.uid}`).get();
+      return { results: snap.exists ? [toHit(snap.id, snap.data()!)] : [] };
+    } catch {
+      return { results: [] }; // getUserByEmail joga se não achar — sem conta com esse e-mail
+    }
+  }
+
+  // Prefixo do nome tal como foi salvo (case-sensitive — mesma limitação de
+  // qualquer range query do Firestore; não é full-text search).
+  const snap = await db.collection('users')
+    .orderBy('name')
+    .startAt(term)
+    .endAt(term + '')
+    .limit(10)
+    .get();
+  return { results: snap.docs.map((d) => toHit(d.id, d.data())) };
+}));
+
+export const adminGetUserDetail = onCall(wrapCallable(async (req) => {
+  assertAdmin(req);
+  const userId = String(req.data?.userId || '').trim();
+  if (!userId) throw new HttpsError('invalid-argument', 'Informe o userId.');
+
+  const userSnap = await db.doc(`users/${userId}`).get();
+  if (!userSnap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+  const user = { id: userSnap.id, ...userSnap.data() } as Record<string, unknown>;
+
+  const isClient = user.role === 'client';
+  const [activitySnap, transactionsSnap, paymentsSnap, validationSnap, ticketsSnap] = await Promise.all([
+    isClient
+      ? db.collection('serviceRequests').where('clientId', '==', userId).orderBy('created_at', 'desc').limit(5).get()
+      : db.collection('proposals').where('professionalId', '==', userId).orderBy('created_at', 'desc').limit(5).get(),
+    db.collection('transactions').where('userId', '==', userId).orderBy('created_at', 'desc').limit(10).get(),
+    db.collection('payments').where('userId', '==', userId).orderBy('created_at', 'desc').limit(10).get(),
+    db.doc(`validations/${userId}`).get(),
+    db.collection('supportTickets').where('userId', '==', userId).orderBy('created_at', 'desc').limit(5).get(),
+  ]);
+
+  const mapDocs = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  return {
+    user,
+    recentRequests: isClient ? mapDocs(activitySnap) : [],
+    recentProposals: isClient ? [] : mapDocs(activitySnap),
+    recentTransactions: mapDocs(transactionsSnap),
+    recentPayments: mapDocs(paymentsSnap),
+    recentTickets: mapDocs(ticketsSnap),
+    validation: validationSnap.exists ? { id: validationSnap.id, ...validationSnap.data() } : null,
+  };
+}));
+
+// ---------------------------------------------------------------------------
 // 9. Compra simulada de diamantes (ponte até a Fase 2 / gateway real)
 // ---------------------------------------------------------------------------
 export const simulatePurchase = onCall(wrapCallable(async (req) => {
