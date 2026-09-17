@@ -42,6 +42,7 @@ const ProProposals = lazy(() => import('@/professional/ProProposals'));
 const Wallet = lazy(() => import('@/professional/Wallet'));
 const DocumentValidation = lazy(() => import('@/professional/DocumentValidation'));
 const AdminPanel = lazy(() => import('@/admin/AdminPanel'));
+const BootstrapAdmin = lazy(() => import('@/pages/BootstrapAdmin'));
 
 function PageFallback() {
   return (
@@ -269,6 +270,16 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+            {/* Uso único pra conceder o 1º admin — a própria function exige o
+                ADMIN_BOOTSTRAP_SECRET, então só precisa estar logado pra acessar a tela. */}
+            <Route
+              path="/bootstrap-admin"
+              element={
+                <ProtectedRoute>
+                  <BootstrapAdmin />
                 </ProtectedRoute>
               }
             />
