@@ -30,7 +30,7 @@ const Privacy = () => {
         <H>1. Quem é o controlador</H>
         <P>
           O tratamento dos seus dados é feito por 50.552.688 JOSE ARAUJO LACERDA FILHO, CNPJ 50.552.688/0001-90, com sede em Rua Salvador Risoleu, 270 B, Jardim Peri Peri, São Paulo/SP, CEP 05536-020
-          ("Conecta Serviço"). Encarregado pelo Tratamento de Dados (DPO): [NOME] —
+          ("Conecta Serviço"). Canal de privacidade (encarregado pelo tratamento de dados) da Conecta Serviço:
           suporte@conectaservicooficial.com.br.
         </P>
 
@@ -134,7 +134,7 @@ const Privacy = () => {
         </P>
 
         <H>12. Contato</H>
-        <P>Encarregado (DPO): [NOME] — suporte@conectaservicooficial.com.br.</P>
+        <P>Canal de privacidade da Conecta Serviço (encarregado pelo tratamento de dados): suporte@conectaservicooficial.com.br.</P>
       </div>
     </div>
   );
