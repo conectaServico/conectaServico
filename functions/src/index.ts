@@ -1016,13 +1016,21 @@ export const adminGetUserDetail = onCall(wrapCallable(async (req) => {
 // ---------------------------------------------------------------------------
 // 9. Compra simulada de diamantes (ponte até a Fase 2 / gateway real)
 // ---------------------------------------------------------------------------
-export const simulatePurchase = onCall(wrapCallable(async (req) => {
+export const simulatePurchase = onCall({ secrets: [MP_ACCESS_TOKEN] }, wrapCallable(async (req) => {
   const uid = assertVerified(req);
   if (process.env.ALLOW_SIMULATED_PAYMENTS !== 'true') {
     throw new HttpsError(
       'failed-precondition',
       'Pagamentos simulados estão desativados. Configure um provedor de pagamento real.'
     );
+  }
+  // Trava de segurança: assim que o Mercado Pago está configurado de verdade
+  // (secret preenchido, não o PLACEHOLDER), a compra "de mentira" morre sozinha
+  // mesmo que ALLOW_SIMULATED_PAYMENTS tenha ficado ligado por esquecimento no
+  // .env — senão qualquer profissional verificado geraria diamante grátis.
+  const mpToken = MP_ACCESS_TOKEN.value();
+  if (mpToken && !mpToken.startsWith('PLACEHOLDER')) {
+    throw new HttpsError('failed-precondition', 'Pagamento real configurado — use o checkout.');
   }
   const packageId = String(req.data?.packageId || '');
   const method = req.data?.method === 'pix' ? 'PIX' : 'Cartão de Crédito';
