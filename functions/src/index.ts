@@ -19,8 +19,9 @@ const db = admin.firestore();
 // invocação pública aqui é seguro.
 setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10, invoker: 'public' });
 
-// Custo (em diamantes) de desbloquear um pedido: base × faixa de metragem × faixa
-// de região, arredondado e limitado. IMPORTANTE: manter idêntico a
+// Custo (em diamantes) de desbloquear um pedido: base × faixa de metragem × região
+// (capital paulista: anéis a partir do centro + bairros nobres; resto: por UF),
+// arredondado e limitado. IMPORTANTE: manter idêntico a
 // src/utils/unlockPricing.ts (o app mostra o valor com essa mesma conta; o
 // servidor é quem cobra e recusa se o valor que o app viu for diferente).
 const UNLOCK_BASE_COST = 10;
@@ -33,15 +34,77 @@ const UNLOCK_AREA_TIERS: Array<{ upToM2: number; mult: number }> = [
   { upToM2: 300, mult: 3 },
   { upToM2: Infinity, mult: 4 },
 ];
+
 const UNLOCK_UF_HIGH = ['SP', 'RJ', 'DF']; // ×1,3
 const UNLOCK_UF_LOW = ['AC', 'AP', 'AM', 'RR', 'RO', 'TO', 'PA', 'MA', 'PI', 'AL', 'SE', 'PB', 'RN']; // ×0,8
 
-function unlockCostFor(r: { areaSize?: unknown; uf?: unknown; state?: unknown }): number {
+// Capital paulista: anéis a partir do centro (Praça da Sé) + piso pros bairros nobres.
+const UNLOCK_SP_CENTER = { lat: -23.5505, lng: -46.6333 };
+const UNLOCK_SP_RINGS: Array<{ upToKm: number; mult: number }> = [
+  { upToKm: 3, mult: 1.8 },
+  { upToKm: 6, mult: 1.6 },
+  { upToKm: 10, mult: 1.45 },
+  { upToKm: Infinity, mult: 1.3 },
+];
+const UNLOCK_SP_NOBRE_MULT = 1.8;
+// Nomes normalizados (sem acento, minúsculos), comparação exata com o bairro do pedido.
+const UNLOCK_SP_NOBRE = new Set([
+  'jardim paulista', 'jardim america', 'jardim europa', 'jardim paulistano', 'jardim guedala',
+  'itaim bibi', 'vila nova conceicao', 'moema', 'indianopolis', 'planalto paulista', 'vila uberabinha',
+  'pinheiros', 'alto de pinheiros', 'vila madalena', 'vila olimpia', 'higienopolis', 'cerqueira cesar',
+  'consolacao', 'paraiso', 'brooklin', 'brooklin paulista', 'brooklin novo', 'campo belo', 'morumbi',
+  'cidade jardim', 'pacaembu', 'sumare', 'perdizes', 'chacara santo antonio', 'real parque', 'panamby',
+]);
+
+const unlockNorm = (s: unknown) =>
+  String(s ?? '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+
+function unlockKmBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+interface UnlockPricingInput {
+  areaSize?: unknown;
+  uf?: unknown;
+  state?: unknown;
+  city?: unknown;
+  cityKey?: unknown;
+  neighborhood?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+  geoPrecise?: unknown;
+}
+
+function unlockRegionMult(r: UnlockPricingInput): number {
+  const uf = String(r.uf || r.state || '').toUpperCase();
+  const city = unlockNorm(r.cityKey || r.city);
+
+  if (uf === 'SP' && city === 'sao paulo') {
+    // Coordenada só vale se veio do CEP (geoPrecise); senão é o centroide do estado.
+    let m = UNLOCK_SP_RINGS[UNLOCK_SP_RINGS.length - 1].mult;
+    if (r.geoPrecise === true && typeof r.lat === 'number' && typeof r.lng === 'number') {
+      const d = unlockKmBetween(UNLOCK_SP_CENTER, { lat: r.lat, lng: r.lng });
+      m = UNLOCK_SP_RINGS.find((ring) => d <= ring.upToKm)!.mult;
+    }
+    if (UNLOCK_SP_NOBRE.has(unlockNorm(r.neighborhood))) m = Math.max(m, UNLOCK_SP_NOBRE_MULT);
+    return m;
+  }
+
+  return UNLOCK_UF_HIGH.includes(uf) ? 1.3 : UNLOCK_UF_LOW.includes(uf) ? 0.8 : 1;
+}
+
+function unlockCostFor(r: UnlockPricingInput): number {
   const area = parseFloat(String(r.areaSize ?? '').replace(',', '.'));
   const areaMult = area > 0 ? UNLOCK_AREA_TIERS.find((t) => area <= t.upToM2)!.mult : 1;
-  const uf = String(r.uf || r.state || '').toUpperCase();
-  const regionMult = UNLOCK_UF_HIGH.includes(uf) ? 1.3 : UNLOCK_UF_LOW.includes(uf) ? 0.8 : 1;
-  return Math.min(UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, Math.round(UNLOCK_BASE_COST * areaMult * regionMult)));
+  return Math.min(UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, Math.round(UNLOCK_BASE_COST * areaMult * unlockRegionMult(r))));
 }
 
 const SIGNUP_BONUS = 100;
