@@ -19,7 +19,31 @@ const db = admin.firestore();
 // invocação pública aqui é seguro.
 setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10, invoker: 'public' });
 
-const UNLOCK_COST = 10;
+// Custo (em diamantes) de desbloquear um pedido: base × faixa de metragem × faixa
+// de região, arredondado e limitado. IMPORTANTE: manter idêntico a
+// src/utils/unlockPricing.ts (o app mostra o valor com essa mesma conta; o
+// servidor é quem cobra e recusa se o valor que o app viu for diferente).
+const UNLOCK_BASE_COST = 10;
+const UNLOCK_MIN_COST = 5;
+const UNLOCK_MAX_COST = 60;
+const UNLOCK_AREA_TIERS: Array<{ upToM2: number; mult: number }> = [
+  { upToM2: 30, mult: 1 },
+  { upToM2: 80, mult: 1.5 },
+  { upToM2: 150, mult: 2 },
+  { upToM2: 300, mult: 3 },
+  { upToM2: Infinity, mult: 4 },
+];
+const UNLOCK_UF_HIGH = ['SP', 'RJ', 'DF']; // ×1,3
+const UNLOCK_UF_LOW = ['AC', 'AP', 'AM', 'RR', 'RO', 'TO', 'PA', 'MA', 'PI', 'AL', 'SE', 'PB', 'RN']; // ×0,8
+
+function unlockCostFor(r: { areaSize?: unknown; uf?: unknown; state?: unknown }): number {
+  const area = parseFloat(String(r.areaSize ?? '').replace(',', '.'));
+  const areaMult = area > 0 ? UNLOCK_AREA_TIERS.find((t) => area <= t.upToM2)!.mult : 1;
+  const uf = String(r.uf || r.state || '').toUpperCase();
+  const regionMult = UNLOCK_UF_HIGH.includes(uf) ? 1.3 : UNLOCK_UF_LOW.includes(uf) ? 0.8 : 1;
+  return Math.min(UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, Math.round(UNLOCK_BASE_COST * areaMult * regionMult)));
+}
+
 const SIGNUP_BONUS = 100;
 const MAX_UNLOCKS = 3;
 const REQUEST_EXPIRY_DAYS = 2; // pedido aberto sem proposta aceita expira depois disso
@@ -285,31 +309,43 @@ export const unlockContact = onCall(wrapCallable(async (req) => {
     if (((reqData.unlockCount as number) ?? 0) >= MAX_UNLOCKS) {
       throw new HttpsError('resource-exhausted', 'Este pedido já atingiu o limite de profissionais.');
     }
-    if (((pro.coinsBalance as number) ?? 0) < UNLOCK_COST) {
-      throw new HttpsError('failed-precondition', 'Saldo de diamantes insuficiente.');
+    const cost = unlockCostFor(reqData);
+    // O app mostra o valor antes de o profissional confirmar; se por qualquer
+    // motivo a conta do servidor der outro número, recusa em vez de cobrar
+    // diferente do que a pessoa viu.
+    const expectedCost = req.data?.expectedCost;
+    if (typeof expectedCost === 'number' && expectedCost !== cost) {
+      throw new HttpsError(
+        'failed-precondition',
+        `O valor deste contato é ${cost} 💎. Atualize a página e confirme de novo.`
+      );
+    }
+    if (((pro.coinsBalance as number) ?? 0) < cost) {
+      throw new HttpsError('failed-precondition', `Saldo de diamantes insuficiente (este contato custa ${cost} 💎).`);
     }
 
     // --- escritas ---
     const now = Date.now();
-    tx.update(proRef, { coinsBalance: FieldValue.increment(-UNLOCK_COST) });
+    tx.update(proRef, { coinsBalance: FieldValue.increment(-cost) });
     tx.update(reqRef, { unlockCount: FieldValue.increment(1) });
     tx.set(db.collection('unlocks').doc(), {
       requestId,
       professionalId: uid,
-      cost: UNLOCK_COST,
+      cost,
       created_at: now,
     });
     tx.set(db.collection('transactions').doc(), {
       userId: uid,
-      amount: -UNLOCK_COST,
+      amount: -cost,
       type: 'UNLOCK_CONTACT',
-      description: `Desbloqueio do pedido #${requestId.substring(0, 5)}`,
+      description: `Desbloqueio do pedido #${requestId.substring(0, 5)} (${cost} 💎)`,
       created_at: now,
     });
 
     return {
       alreadyUnlocked: false,
-      newBalance: ((pro.coinsBalance as number) ?? 0) - UNLOCK_COST,
+      cost,
+      newBalance: ((pro.coinsBalance as number) ?? 0) - cost,
       ...contact(),
     };
   });

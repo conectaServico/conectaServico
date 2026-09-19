@@ -12,6 +12,7 @@ import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import Select from '@/components/Select';
+import { unlockCostFor, UNLOCK_BASE_COST } from '@/utils/unlockPricing';
 
 const RequestDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +63,8 @@ const RequestDetails = () => {
   const [unlocking, setUnlocking] = useState(false);
   const [clientPhone, setClientPhone] = useState<string | null>(null);
   const [clientName, setClientName] = useState<string | null>(null);
-  const UNLOCK_COST = 10;
+  // Custo varia com a metragem (m²) e a região do pedido — mesma conta do servidor.
+  const unlockCost = request ? unlockCostFor(request) : UNLOCK_BASE_COST;
 
   useEffect(() => {
     if (!id) return;
@@ -191,15 +193,15 @@ const RequestDetails = () => {
       return;
     }
 
-    if ((user.coinsBalance || 0) < UNLOCK_COST) {
-      toast.error('Saldo insuficiente. Você precisa de mais diamantes para desbloquear.');
+    if ((user.coinsBalance || 0) < unlockCost) {
+      toast.error(`Saldo insuficiente. Este contato custa ${unlockCost} 💎 — compre mais diamantes para desbloquear.`);
       return;
     }
 
     setUnlocking(true);
     try {
       // Débito + registro + retorno do contato são feitos de forma atômica no servidor.
-      const { data } = await unlockContactFn({ requestId: id });
+      const { data } = await unlockContactFn({ requestId: id, expectedCost: unlockCost });
 
       setHasUnlocked(true);
       setClientPhone(data.clientPhone || null);
@@ -210,7 +212,7 @@ const RequestDetails = () => {
         const newBalance =
           typeof data.newBalance === 'number'
             ? data.newBalance
-            : Math.max(0, (user.coinsBalance || 0) - UNLOCK_COST);
+            : Math.max(0, (user.coinsBalance || 0) - unlockCost);
         useUserStore.getState().setUser({ ...user, coinsBalance: newBalance });
         toast.success('Contato desbloqueado com sucesso!');
       }
@@ -373,7 +375,7 @@ const RequestDetails = () => {
     try {
       await cancelRequestFn({ requestId: id });
       setRequest({ ...request, status: 'CANCELED' });
-      toast.success('Pedido cancelado. Quem já tinha desbloqueado foi reembolsado.');
+      toast.success('Pedido cancelado.');
     } catch (err) {
       console.error(err);
       toast.error(callableErrorMessage(err, 'Não foi possível cancelar o pedido.'));
@@ -1048,7 +1050,7 @@ const RequestDetails = () => {
                   <>
                     Liberar Pedido
                     <span className="flex items-center gap-1 bg-black/10 px-2 py-0.5 rounded-full text-sm ml-2">
-                      <span className="text-yellow-300">💎</span> {UNLOCK_COST}
+                      <span className="text-yellow-300">💎</span> {unlockCost}
                     </span>
                   </>
                 )}

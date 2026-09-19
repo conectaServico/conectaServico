@@ -5,6 +5,7 @@ import { useUserStore } from '@/store/userStore';
 import { JobRequest, Urgency } from '@/types';
 import { geohashQueryBounds, distanceBetween } from '@/utils/geo';
 import { CATEGORIES_MAP } from '@/utils/categories';
+import { unlockCostFor } from '@/utils/unlockPricing';
 import { registerForPush, pushSupported, pushPermission, type PushPermission } from '@/services/push';
 import { useProOnboarding } from '@/hooks/useProOnboarding';
 import ProOnboarding from '@/components/ProOnboarding';
@@ -138,7 +139,7 @@ const ProHome = () => {
       id: 'unlock',
       gradient: 'from-blue-500 to-blue-700',
       icon: Lock,
-      title: 'Gastou 10 💎, o contato é seu',
+      title: 'Gastou diamantes, o contato é seu',
       subtitle: 'Sem comissão sobre o serviço. Até 3 profissionais por pedido — chegue primeiro.',
       cta: { label: 'Ver pedidos', to: '/home' },
     },
@@ -466,6 +467,11 @@ const ProHome = () => {
                       <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4 text-slate-400" />
                         <span className="font-medium tracking-widest text-slate-400">•••••-••••</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">💎</span>
+                        <span className="font-medium">{unlockCostFor(job)} para liberar</span>
                       </div>
 
                       <div className="flex items-center gap-2">

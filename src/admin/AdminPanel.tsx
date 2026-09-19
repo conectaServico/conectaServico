@@ -76,7 +76,7 @@ interface ValidationRequest {
 }
 
 const CAT_LABEL: Record<string, string> = {
-  fake_lead: 'Pedido falso / reembolso',
+  fake_lead: 'Pedido falso / fraude',
   no_show: 'Não compareceu',
   abusive: 'Abuso',
   payment: 'Pagamento',

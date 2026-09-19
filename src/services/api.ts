@@ -7,13 +7,14 @@ import { functions } from './firebase';
  */
 
 export const unlockContactFn = httpsCallable<
-  { requestId: string },
+  { requestId: string; expectedCost?: number },
   {
     alreadyUnlocked: boolean;
     clientName: string;
     clientPhone: string;
     clientEmail: string;
     newBalance?: number;
+    cost?: number;
   }
 >(functions, 'unlockContact');
 

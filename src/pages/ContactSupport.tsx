@@ -11,7 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const CATEGORIES: { value: SupportCategory; label: string }[] = [
-  { value: 'fake_lead', label: 'Pedido falso / quero reembolso de diamantes' },
+  { value: 'fake_lead', label: 'Pedido falso ou fraude (análise da equipe)' },
   { value: 'no_show', label: 'Profissional/cliente não compareceu' },
   { value: 'abusive', label: 'Comportamento abusivo de um usuário' },
   { value: 'payment', label: 'Problema com pagamento / diamantes' },
@@ -148,7 +148,7 @@ const ContactSupport = () => {
               rows={5}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Descreva com o máximo de detalhes. Se for reembolso, diga qual pedido e por quê."
+              placeholder="Descreva com o máximo de detalhes e informe qual pedido. Lembrando: diamantes usados para liberar um contato não são reembolsados quando o cliente não responde."
               className="w-full p-4 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none"
             />
           </div>

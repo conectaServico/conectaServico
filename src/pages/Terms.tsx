@@ -68,10 +68,10 @@ const Terms = () => {
         <H>5. Regras para o Profissional — Diamantes</H>
         <P>
           O Profissional adquire diamantes e os gasta para <strong>desbloquear o contato</strong> de um
-          Cliente (custo fixo por desbloqueio, informado no app). O desbloqueio dá acesso ao contato e
+          Cliente (o custo em diamantes varia conforme o tamanho do serviço, em m², e a região do pedido, e é sempre informado no app antes da confirmação). O desbloqueio dá acesso ao contato e
           entrada no chat do pedido; <strong>não garante a contratação</strong>. Os diamantes gastos
-          <strong> não são reembolsados</strong> caso o Cliente escolha outro profissional, não responda,
-          desista ou cancele o pedido. Reembolso só ocorre, a critério exclusivo da plataforma, quando
+          <strong> não são reembolsados</strong> caso o Profissional não consiga contato com o Cliente, o
+          Cliente escolha outro profissional, não responda, desista ou cancele o pedido. Reembolso só ocorre, a critério exclusivo da plataforma, quando
           um chamado de suporte comprovar pedido falso, fraude ou violação destes Termos pelo Cliente.
         </P>
 

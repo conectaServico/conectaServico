@@ -212,11 +212,11 @@ const Wallet = () => {
           <ul className="space-y-4">
             <li className="flex gap-3 items-start">
               <div className="bg-primary/10 p-1.5 rounded-full mt-0.5"><Coins className="w-4 h-4 text-primary" /></div>
-              <p className="text-sm text-slate-600 leading-relaxed">Você usa diamantes para <strong className="text-slate-900">desbloquear o contato</strong> dos clientes e enviar orçamentos.</p>
+              <p className="text-sm text-slate-600 leading-relaxed">Você usa diamantes para <strong className="text-slate-900">desbloquear o contato</strong> dos clientes. O valor de cada pedido varia com o <strong className="text-slate-900">tamanho do serviço (m²) e a região</strong> e aparece antes de você confirmar.</p>
             </li>
             <li className="flex gap-3 items-start">
-              <div className="bg-emerald-50 p-1.5 rounded-full mt-0.5"><ArrowUpRight className="w-4 h-4 text-emerald-500" /></div>
-              <p className="text-sm text-slate-600 leading-relaxed"><strong className="text-slate-900">Reembolso Garantido:</strong> Se você não for o profissional escolhido pelo cliente, seus diamantes voltam automaticamente.</p>
+              <div className="bg-amber-50 p-1.5 rounded-full mt-0.5"><ShieldAlert className="w-4 h-4 text-amber-600" /></div>
+              <p className="text-sm text-slate-600 leading-relaxed"><strong className="text-slate-900">Sem reembolso:</strong> diamantes usados para liberar um contato não voltam, mesmo que você não consiga falar com o cliente ou não seja o escolhido. Só analisamos, caso a caso, pedido falso ou fraude.</p>
             </li>
             <li className="flex gap-3 items-start">
               <div className="bg-slate-100 p-1.5 rounded-full mt-0.5"><ShieldAlert className="w-4 h-4 text-slate-500" /></div>
