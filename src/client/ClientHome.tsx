@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PlusCircle, ShieldCheck, MessageSquare, Star, ArrowRight, Search, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { db } from '@/services/firebase';
+import { useUserStore } from '@/store/userStore';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 import { CATEGORY_MENUS, imageForService } from '@/utils/categories';
 import { normalize } from '@/utils/search';
@@ -43,37 +46,59 @@ const clientBanners: Banner[] = [
   },
 ];
 
-interface FeaturedServiceCardProps {
-  title: string;
-  description: string;
-  image: string;
-  to: string;
-  /** objectPosition da foto (recorte) — a foto é vertical e o card é largo. */
-  imagePosition?: string;
-}
+// Banner acolhedor logo abaixo do carrossel: convida a fazer o pedido. Quem ainda
+// não fez nenhum vê "primeiro pedido"; quem já fez vê uma chamada mais geral.
+// Mobile: foto em cima e texto embaixo; desktop: texto à esquerda e foto à direita
+// (a foto tem largura limitada pra não estourar o recorte em telas largas).
+const HELP_BANNER_PHOTO = 'https://images.unsplash.com/photo-1758876201450-cf77ab8b95bc?auto=format&fit=crop&w=1000&q=75';
 
-// Card de destaque de um serviço específico — foto grande em cima, card branco
-// embaixo com a frase e a seta de "ver detalhes" (mesmo padrão do card de
-// "Diarista" da referência do GetNinjas).
-const FeaturedServiceCard = ({ title, description, image, to, imagePosition = '50% 50%' }: FeaturedServiceCardProps) => (
-  <Link to={to} className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-    <div className="h-56">
-      <img src={image} alt={title} loading="lazy" className="w-full h-full object-cover" style={{ objectPosition: imagePosition }} />
+const HelpBanner = ({ firstOrder }: { firstOrder: boolean }) => (
+  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-blue-700 shadow-sm md:flex md:items-center md:min-h-[240px]">
+    <div className="relative h-44 md:h-auto md:absolute md:inset-y-0 md:right-0 md:w-[44%]">
+      <img
+        src={HELP_BANNER_PHOTO}
+        alt="Mulher sorrindo ao telefone"
+        loading="lazy"
+        className="h-full w-full object-cover"
+        style={{ objectPosition: '62% 28%' }}
+      />
+      <div className="hidden md:block absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-primary to-transparent" />
     </div>
-    <div className="p-4 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h3 className="font-bold text-slate-900 text-base mb-0.5">{title}</h3>
-        <p className="text-sm text-slate-500 truncate">{description}</p>
-      </div>
-      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-        <ArrowRight className="w-5 h-5 text-white" />
-      </div>
+    <div className="relative z-10 p-6 md:p-10 md:w-[58%]">
+      <span className="inline-block bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-3">
+        100% grátis
+      </span>
+      <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight">
+        {firstOrder ? 'Faça seu primeiro pedido' : 'Precisa de ajuda com outro serviço?'}
+      </h2>
+      <p className="text-blue-100 text-sm md:text-base mt-2 max-w-md">
+        {firstOrder
+          ? 'Conte o que você precisa e receba profissionais verificados da sua região. Leva menos de 2 minutos.'
+          : 'Conte o que você precisa e receba propostas de profissionais da sua região.'}
+      </p>
+      <Link
+        to="/request/new"
+        className="mt-5 inline-flex items-center gap-2 bg-white text-primary font-bold text-sm md:text-base px-5 py-3 rounded-xl hover:bg-blue-50 transition-colors"
+      >
+        {firstOrder ? 'Fazer meu primeiro pedido' : 'Fazer um pedido'} <ArrowRight className="w-4 h-4" />
+      </Link>
     </div>
-  </Link>
+  </div>
 );
 
 const ClientHome = () => {
+  const { user } = useUserStore();
+  // null = ainda descobrindo (não mostra o banner pra não piscar o texto errado).
+  const [hasOrders, setHasOrders] = useState<boolean | null>(null);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getDocs(query(collection(db, 'serviceRequests'), where('clientId', '==', user.id), limit(1)))
+      .then((snap) => setHasOrders(!snap.empty))
+      .catch(() => setHasOrders(true)); // na dúvida, texto genérico (nunca afirma "primeiro pedido" sem ter certeza)
+  }, [user?.id]);
+
   const q = normalize(search.trim());
   const searching = q.length > 0;
   const results = searching ? ALL_SERVICES.filter(({ service }) => normalize(service).includes(q)).slice(0, 8) : [];
@@ -83,7 +108,7 @@ const ClientHome = () => {
       {/* Sem cabeçalho de "bem-vindo"/nome aqui — o Navbar já dá acesso ao perfil
           (dropdown no desktop, aba "Perfil" no rodapé mobile); duplicar só
           ocupava espaço no topo da home à toa. */}
-      <div className="px-4 pt-6 space-y-8">
+      <div className="px-4 pt-6 space-y-8 max-w-5xl mx-auto">
         {/* Busca — primeira coisa da home, igual à referência. Digitando, some
             o resto (banner/categorias) e mostra só os serviços que baterem,
             de qualquer categoria. */}
@@ -129,16 +154,8 @@ const ClientHome = () => {
         <>
         <BannerCarousel banners={clientBanners} />
 
-        {/* Mobilidade elétrica está em alta — logo abaixo do banner, igual à
-            referência (card da "Diarista"): foto grande + card branco com a
-            frase e a seta que leva pra lista de serviços daquela categoria. */}
-        <FeaturedServiceCard
-          title="Scooter Elétrica"
-          description="Troca de bateria, freios, pneus e mais"
-          image="https://images.unsplash.com/photo-1601998543706-1aaa490346d1?auto=format&fit=crop&w=900&q=75"
-          imagePosition="50% 14%"
-          to={`/categoria/assistencia-tecnica?aba=${encodeURIComponent('Scooter Elétrica')}`}
-        />
+        {/* Convite pro pedido (só depois de saber se é o primeiro; reserva a altura pra não pular). */}
+        {hasOrders === null ? <div className="min-h-[240px]" /> : <HelpBanner firstOrder={!hasOrders} />}
 
         {/* Uma fileira por categoria, com scroll horizontal de fotos por serviço
             específico — cada bloco é a "categoria" (Reformas, Assistência
