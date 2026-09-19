@@ -29,9 +29,9 @@ const Privacy = () => {
 
         <H>1. Quem é o controlador</H>
         <P>
-          O tratamento dos seus dados é feito por [RAZÃO SOCIAL], CNPJ [CNPJ], [ENDEREÇO]
+          O tratamento dos seus dados é feito por 50.552.688 JOSE ARAUJO LACERDA FILHO, CNPJ 50.552.688/0001-90, com sede em Rua Salvador Risoleu, 270 B, Jardim Peri Peri, São Paulo/SP, CEP 05536-020
           ("Conecta Serviço"). Encarregado pelo Tratamento de Dados (DPO): [NOME] —
-          [E-MAIL DO ENCARREGADO].
+          suporte@conectaservicooficial.com.br.
         </P>
 
         <H>2. Dados que coletamos</H>
@@ -107,7 +107,7 @@ const Privacy = () => {
           Você pode solicitar: confirmação e acesso aos seus dados; correção; anonimização, bloqueio ou
           eliminação de dados desnecessários ou tratados em desconformidade; portabilidade; informação
           sobre compartilhamentos; e revogação do consentimento. Para exercer, use o canal de suporte do
-          app ou escreva ao encarregado ([E-MAIL DO ENCARREGADO]). Responderemos nos prazos da LGPD.
+          app ou escreva ao encarregado (suporte@conectaservicooficial.com.br). Responderemos nos prazos da LGPD.
         </P>
 
         <H>8. Segurança</H>

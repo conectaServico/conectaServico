@@ -30,7 +30,7 @@ const Terms = () => {
         <H>1. Definições</H>
         <P>
           <strong>Plataforma / Conecta Serviço:</strong> o aplicativo e o site operados por
-          [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO]. <strong>Cliente:</strong> usuário que
+          50.552.688 JOSE ARAUJO LACERDA FILHO, CNPJ 50.552.688/0001-90, com sede em Rua Salvador Risoleu, 270 B, Jardim Peri Peri, São Paulo/SP, CEP 05536-020. <strong>Cliente:</strong> usuário que
           publica um pedido de serviço. <strong>Profissional:</strong> usuário que oferece serviços e
           utiliza diamantes para desbloquear o contato de clientes. <strong>Diamantes:</strong> créditos
           virtuais, sem valor monetário e não conversíveis em dinheiro.
