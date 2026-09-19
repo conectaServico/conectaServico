@@ -134,7 +134,7 @@ const Privacy = () => {
         </P>
 
         <H>12. Contato</H>
-        <P>Encarregado (DPO): [NOME] — [E-MAIL DO ENCARREGADO]. Suporte: suporte@conectaservicooficial.com.br.</P>
+        <P>Encarregado (DPO): [NOME] — suporte@conectaservicooficial.com.br.</P>
       </div>
     </div>
   );

@@ -197,6 +197,14 @@ const ContactSupport = () => {
 
       <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-sm text-slate-600 flex flex-wrap gap-x-8 gap-y-2">
         <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> suporte@conectaservicooficial.com.br</span>
+        <a
+          href="https://wa.me/5511972089898"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 hover:text-primary transition-colors"
+        >
+          <MessageCircle className="w-4 h-4 text-primary" /> WhatsApp (11) 97208-9898
+        </a>
         <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-primary" /> Seg a Sex, 9h–18h</span>
       </div>
     </div>

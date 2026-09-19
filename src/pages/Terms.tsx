@@ -141,7 +141,7 @@ const Terms = () => {
         </P>
 
         <H>14. Contato</H>
-        <P>Dúvidas: suporte@conectaservicooficial.com.br. Encarregado de dados (LGPD): [E-MAIL DO ENCARREGADO].</P>
+        <P>Dúvidas e encarregado de dados (LGPD): suporte@conectaservicooficial.com.br.</P>
       </div>
     </div>
   );
