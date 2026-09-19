@@ -43,6 +43,7 @@ const Wallet = lazy(() => import('@/professional/Wallet'));
 const DocumentValidation = lazy(() => import('@/professional/DocumentValidation'));
 const AdminPanel = lazy(() => import('@/admin/AdminPanel'));
 const BootstrapAdmin = lazy(() => import('@/pages/BootstrapAdmin'));
+const AuthAction = lazy(() => import('@/pages/AuthAction'));
 
 function PageFallback() {
   return (
@@ -145,6 +146,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/auth/action" element={<AuthAction />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/categoria/:slug" element={<CategoryPage />} />

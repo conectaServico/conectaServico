@@ -7,6 +7,8 @@ import * as crypto from 'crypto';
 import * as admin from 'firebase-admin';
 import { FieldValue, AggregateField, type DocumentData, type QuerySnapshot } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import nodemailer from 'nodemailer';
+import { passwordResetEmail, SITE_URL, SUPPORT_EMAIL } from './emailTemplates';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -126,6 +128,10 @@ const DIAMOND_PACKAGES: Record<string, { diamonds: number; price: number }> = {
 const ADMIN_BOOTSTRAP_SECRET = defineSecret('ADMIN_BOOTSTRAP_SECRET');
 const MP_ACCESS_TOKEN = defineSecret('MP_ACCESS_TOKEN');
 const MP_WEBHOOK_SECRET = defineSecret('MP_WEBHOOK_SECRET');
+// Senha da caixa suporte@ (SMTP do UOL Host) — usada pra mandar os e-mails bonitos
+// (redefinir senha etc.). Enquanto for "PLACEHOLDER" as callables de e-mail
+// respondem "email-not-configured" e o app cai no e-mail padrão do Firebase.
+const SMTP_PASS = defineSecret('SMTP_PASS');
 
 const MP_API = 'https://api.mercadopago.com';
 
@@ -1891,5 +1897,69 @@ export const resolveSupportTicket = onCall(wrapCallable(async (req) => {
     }).catch(() => undefined);
   }
 
+  return { ok: true };
+}));
+
+// ---------------------------------------------------------------------------
+// 18. E-mail de redefinição de senha bonito (HTML) — substitui o padrão do
+// Firebase quando o SMTP está configurado. Sem auth (quem esqueceu a senha não
+// está logado), então: resposta SEMPRE "ok" (não revela se o e-mail existe) e
+// limite por e-mail (1 a cada 60 s, 5 por dia) contra uso pra encher a caixa
+// de alguém. O link aponta pra página /auth/action do próprio site.
+// ---------------------------------------------------------------------------
+async function allowMail(email: string): Promise<boolean> {
+  const id = crypto.createHash('sha256').update(email).digest('hex').slice(0, 32);
+  const ref = db.doc(`mailRateLimits/${id}`);
+  const now = Date.now();
+  const day = new Date(now).toISOString().slice(0, 10);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = (snap.data() || {}) as { last?: number; day?: string; count?: number };
+    const count = d.day === day ? d.count || 0 : 0;
+    if ((d.last && now - d.last < 60_000) || count >= 5) return false;
+    tx.set(ref, { last: now, day, count: count + 1 });
+    return true;
+  });
+}
+
+export const sendPasswordReset = onCall({ secrets: [SMTP_PASS] }, wrapCallable(async (req) => {
+  const email = String(req.data?.email || '').trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Digite um e-mail válido.');
+  }
+
+  const pass = SMTP_PASS.value();
+  if (!pass || pass.startsWith('PLACEHOLDER')) {
+    throw new HttpsError('failed-precondition', 'email-not-configured');
+  }
+
+  if (!(await allowMail(email))) return { ok: true };
+
+  try {
+    await admin.auth().getUserByEmail(email);
+  } catch {
+    return { ok: true }; // sem conta com esse e-mail — não revela
+  }
+
+  const firebaseLink = await admin.auth().generatePasswordResetLink(email);
+  const code = new URL(firebaseLink).searchParams.get('oobCode');
+  if (!code) throw new HttpsError('internal', 'Não foi possível gerar o link.');
+  const link = `${SITE_URL}/auth/action?mode=resetPassword&oobCode=${encodeURIComponent(code)}&lang=pt-BR`;
+
+  const { subject, html, text } = passwordResetEmail({ link, email });
+  const transport = nodemailer.createTransport({
+    host: 'smtp.uhserver.com',
+    port: 465,
+    secure: true,
+    auth: { user: SUPPORT_EMAIL, pass },
+  });
+  await transport.sendMail({
+    from: `"Conecta Serviço" <${SUPPORT_EMAIL}>`,
+    to: email,
+    replyTo: SUPPORT_EMAIL,
+    subject,
+    html,
+    text,
+  });
   return { ok: true };
 }));

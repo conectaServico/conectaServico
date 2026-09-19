@@ -6,20 +6,20 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   signInWithCredential,
-  sendPasswordResetEmail,
   signOut,
   type User as FirebaseUser,
   type ConfirmationResult,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase';
+import { requestPasswordReset } from '@/utils/passwordReset';
 import { useUserStore } from '@/store/userStore';
 import { useAudienceStore } from '@/store/audienceStore';
 import { toE164BR } from '@/hooks/useVerified';
 import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
 import { maskPhone } from '@/utils/masks';
 import OtpInput from '@/components/OtpInput';
-import { Mail, Lock, Loader2, Eye, EyeOff, Phone, MessageSquare } from 'lucide-react';
+import { Mail, Lock, Loader2, Eye, EyeOff, Phone, MessageSquare, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { User, TERMS_VERSION } from '@/types';
 import { Capacitor } from '@capacitor/core';
@@ -38,6 +38,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   // Login do profissional (celular + SMS)
   const [phone, setPhone] = useState('');
@@ -165,8 +166,8 @@ const Login = () => {
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email.trim());
-      toast.success('Enviamos um link para redefinir sua senha.');
+      await requestPasswordReset(email.trim());
+      setResetSent(true);
     } catch (err) {
       console.error(err);
       toast.error('Não foi possível enviar o e-mail de redefinição.');
@@ -368,15 +369,36 @@ const Login = () => {
                 </div>
               </div>
 
-              <div className="text-right -mt-1">
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-sm font-bold text-primary hover:underline"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
+              {resetSent ? (
+                <div className="flex items-start gap-3 bg-success/5 border border-success/20 rounded-xl p-3.5">
+                  <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-bold text-slate-800">Link de redefinição enviado!</p>
+                    <p className="text-slate-500">
+                      Confira a caixa de entrada de <strong>{email.trim()}</strong> (e o spam) e siga o link pra criar uma senha nova.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setResetSent(false)}
+                      className="mt-1 text-primary font-bold hover:underline"
+                    >
+                      Usar outro e-mail
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-right -mt-1">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-sm font-bold text-primary hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+              )}
 
               <button
                 type="submit"

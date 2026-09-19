@@ -186,6 +186,13 @@ export const deleteMyAccountFn = httpsCallable<Record<string, never>, { ok: bool
   'deleteMyAccount'
 );
 
+/**
+ * Pede o e-mail bonito de redefinição de senha. Sem login (quem esqueceu a senha
+ * não está logado); responde ok mesmo se o e-mail não existir. Falha com
+ * "email-not-configured" enquanto o SMTP não estiver ligado no servidor.
+ */
+export const sendPasswordResetFn = httpsCallable<{ email: string }, { ok: boolean }>(functions, 'sendPasswordReset');
+
 /** Extrai a mensagem amigável de um erro de callable (HttpsError). */
 export function callableErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
