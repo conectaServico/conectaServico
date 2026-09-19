@@ -136,14 +136,6 @@ const ProHome = () => {
       cta: { label: 'Copiar meu link', onClick: copyInviteLink },
     },
     {
-      id: 'unlock',
-      gradient: 'from-blue-500 to-blue-700',
-      icon: Lock,
-      title: 'Gastou diamantes, o contato é seu',
-      subtitle: 'Sem comissão sobre o serviço. Até 3 profissionais por pedido — chegue primeiro.',
-      cta: { label: 'Ver pedidos', to: '/home' },
-    },
-    {
       id: 'verified',
       gradient: 'from-emerald-400 to-emerald-600',
       icon: ShieldCheck,

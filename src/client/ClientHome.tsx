@@ -48,15 +48,17 @@ interface FeaturedServiceCardProps {
   description: string;
   image: string;
   to: string;
+  /** objectPosition da foto (recorte) — a foto é vertical e o card é largo. */
+  imagePosition?: string;
 }
 
 // Card de destaque de um serviço específico — foto grande em cima, card branco
 // embaixo com a frase e a seta de "ver detalhes" (mesmo padrão do card de
 // "Diarista" da referência do GetNinjas).
-const FeaturedServiceCard = ({ title, description, image, to }: FeaturedServiceCardProps) => (
+const FeaturedServiceCard = ({ title, description, image, to, imagePosition = '50% 50%' }: FeaturedServiceCardProps) => (
   <Link to={to} className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-    <div className="h-44">
-      <img src={image} alt={title} loading="lazy" className="w-full h-full object-cover" />
+    <div className="h-56">
+      <img src={image} alt={title} loading="lazy" className="w-full h-full object-cover" style={{ objectPosition: imagePosition }} />
     </div>
     <div className="p-4 flex items-center justify-between gap-3">
       <div className="min-w-0">
@@ -133,7 +135,8 @@ const ClientHome = () => {
         <FeaturedServiceCard
           title="Scooter Elétrica"
           description="Troca de bateria, freios, pneus e mais"
-          image="https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=900&q=75"
+          image="https://images.unsplash.com/photo-1601998543706-1aaa490346d1?auto=format&fit=crop&w=900&q=75"
+          imagePosition="50% 14%"
           to={`/categoria/assistencia-tecnica?aba=${encodeURIComponent('Scooter Elétrica')}`}
         />
 

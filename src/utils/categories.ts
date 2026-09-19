@@ -115,8 +115,8 @@ export const SERVICE_IMAGES: Record<string, string> = {
   'Técnico de celular': 'https://images.unsplash.com/photo-1550041473-d296a3a8a18a?auto=format&fit=crop&w=400&q=70',
   'Técnico de informática': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=70',
   // Assistência técnica — Scooter Elétrica
-  'Troca de bateria': 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=400&q=70',
-  'Motor elétrico': 'https://images.unsplash.com/photo-1624243519828-52a0f2c88af3?auto=format&fit=crop&w=400&q=70',
+  'Troca de bateria': 'https://images.unsplash.com/photo-1601998543706-1aaa490346d1?auto=format&fit=crop&crop=faces&w=400&h=400&q=70',
+  'Motor elétrico': 'https://images.unsplash.com/photo-1603114595212-71ee69bb6eb1?auto=format&fit=crop&crop=entropy&w=400&h=400&q=70',
   'Freios': 'https://images.unsplash.com/photo-1675798227643-da319f8ee8f7?auto=format&fit=crop&w=400&q=70',
   'Pneus e câmaras': 'https://images.unsplash.com/photo-1687203627800-da3fb4db92eb?auto=format&fit=crop&w=400&q=70',
   'Corrente e marchas': 'https://images.unsplash.com/photo-1738769911835-54f3cac68edd?auto=format&fit=crop&w=400&q=70',

@@ -1,6 +1,6 @@
 /**
  * Custo (em diamantes) de desbloquear um pedido: base × faixa de metragem (m²) ×
- * multiplicador de região, arredondado e limitado (5 a 60). O app só MOSTRA esse
+ * multiplicador de região, arredondado e limitado (5 a 60; até 100 acima de 400 m²). O app só MOSTRA esse
  * valor — quem cobra é a Function `unlockContact`, que faz a mesma conta e recusa
  * se o número que o app viu for diferente.
  *
@@ -12,14 +12,16 @@
  */
 export const UNLOCK_BASE_COST = 10;
 const UNLOCK_MIN_COST = 5;
-const UNLOCK_MAX_COST = 60;
+const UNLOCK_MAX_COST = 60; // teto geral (sem metragem ou até 400 m²)
 
-const AREA_TIERS: Array<{ upToM2: number; mult: number }> = [
-  { upToM2: 30, mult: 1 },
-  { upToM2: 80, mult: 1.5 },
-  { upToM2: 150, mult: 2 },
-  { upToM2: 300, mult: 3 },
-  { upToM2: Infinity, mult: 4 },
+// `max` = teto daquela faixa. Acima de 400 m² o multiplicador sobe pra 6 e o teto pra 100 💎.
+const AREA_TIERS: Array<{ upToM2: number; mult: number; max: number }> = [
+  { upToM2: 30, mult: 1, max: 60 },
+  { upToM2: 80, mult: 1.5, max: 60 },
+  { upToM2: 150, mult: 2, max: 60 },
+  { upToM2: 300, mult: 3, max: 60 },
+  { upToM2: 400, mult: 4, max: 60 },
+  { upToM2: Infinity, mult: 6, max: 100 },
 ];
 
 const UF_HIGH = ['SP', 'RJ', 'DF']; // ×1,3
@@ -90,6 +92,7 @@ function regionMult(r: UnlockPricingInput): number {
 
 export function unlockCostFor(r: UnlockPricingInput): number {
   const area = parseFloat(String(r.areaSize ?? '').replace(',', '.'));
-  const areaMult = area > 0 ? AREA_TIERS.find((t) => area <= t.upToM2)!.mult : 1;
-  return Math.min(UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, Math.round(UNLOCK_BASE_COST * areaMult * regionMult(r))));
+  const tier = area > 0 ? AREA_TIERS.find((t) => area <= t.upToM2)! : null;
+  const raw = Math.round(UNLOCK_BASE_COST * (tier?.mult ?? 1) * regionMult(r));
+  return Math.min(tier?.max ?? UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, raw));
 }

@@ -27,12 +27,13 @@ setGlobalOptions({ region: 'southamerica-east1', maxInstances: 10, invoker: 'pub
 const UNLOCK_BASE_COST = 10;
 const UNLOCK_MIN_COST = 5;
 const UNLOCK_MAX_COST = 60;
-const UNLOCK_AREA_TIERS: Array<{ upToM2: number; mult: number }> = [
-  { upToM2: 30, mult: 1 },
-  { upToM2: 80, mult: 1.5 },
-  { upToM2: 150, mult: 2 },
-  { upToM2: 300, mult: 3 },
-  { upToM2: Infinity, mult: 4 },
+const UNLOCK_AREA_TIERS: Array<{ upToM2: number; mult: number; max: number }> = [
+  { upToM2: 30, mult: 1, max: 60 },
+  { upToM2: 80, mult: 1.5, max: 60 },
+  { upToM2: 150, mult: 2, max: 60 },
+  { upToM2: 300, mult: 3, max: 60 },
+  { upToM2: 400, mult: 4, max: 60 },
+  { upToM2: Infinity, mult: 6, max: 100 },
 ];
 
 const UNLOCK_UF_HIGH = ['SP', 'RJ', 'DF']; // ×1,3
@@ -103,8 +104,9 @@ function unlockRegionMult(r: UnlockPricingInput): number {
 
 function unlockCostFor(r: UnlockPricingInput): number {
   const area = parseFloat(String(r.areaSize ?? '').replace(',', '.'));
-  const areaMult = area > 0 ? UNLOCK_AREA_TIERS.find((t) => area <= t.upToM2)!.mult : 1;
-  return Math.min(UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, Math.round(UNLOCK_BASE_COST * areaMult * unlockRegionMult(r))));
+  const tier = area > 0 ? UNLOCK_AREA_TIERS.find((t) => area <= t.upToM2)! : null;
+  const raw = Math.round(UNLOCK_BASE_COST * (tier?.mult ?? 1) * unlockRegionMult(r));
+  return Math.min(tier?.max ?? UNLOCK_MAX_COST, Math.max(UNLOCK_MIN_COST, raw));
 }
 
 const SIGNUP_BONUS = 100;
