@@ -6,7 +6,7 @@ const audience = process.env.APP_AUDIENCE === 'client' ? 'client' : 'professiona
 
 const config: CapacitorConfig = {
   appId: audience === 'client' ? 'com.conectaservico.app' : 'com.conectaservico.pro',
-  appName: audience === 'client' ? 'Conecta Serviço' : 'Conecta Serviço Pro',
+  appName: audience === 'client' ? 'Conecta Serviço Cliente' : 'Conecta Serviço Profissional',
   webDir: process.env.APP_WEB_DIR || 'dist',
 };
 

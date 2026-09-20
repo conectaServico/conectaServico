@@ -95,8 +95,8 @@ function App() {
         if (profile && LOCKED_AUDIENCE && profile.role !== LOCKED_AUDIENCE) {
           toast.error(
             profile.role === 'professional'
-              ? 'Essa conta é de profissional. Use o app Conecta Serviço Pro.'
-              : 'Essa conta é de cliente. Use o app Conecta Serviço.',
+              ? 'Essa conta é de profissional. Use o app Conecta Serviço Profissional.'
+              : 'Essa conta é de cliente. Use o app Conecta Serviço Cliente.',
             { duration: 6000 }
           );
           await signOut(auth); // dispara este callback de novo, já deslogado

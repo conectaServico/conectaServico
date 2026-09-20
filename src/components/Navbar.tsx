@@ -13,6 +13,8 @@ import {
 import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { CATEGORY_MENUS } from '@/utils/categories';
+import { LOCKED_AUDIENCE } from '@/config/appTarget';
+import AppLogo from '@/components/AppLogo';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useUserStore();
@@ -60,7 +62,7 @@ const Navbar = () => {
     <>
       {/* Desktop Navigation - OLX Style */}
       {!isActive('/login') && !isActive('/register') && (
-      <nav className="hidden md:block bg-white border-b border-slate-200 sticky top-0 z-50">
+      <nav className="hidden md:block bg-white border-b border-slate-200 sticky top-[var(--safe-top)] z-50">
         {/* Main Header */}
         <div className="flex items-center justify-between h-20 px-4 max-w-7xl mx-auto">
           
@@ -316,12 +318,18 @@ const Navbar = () => {
 
       {/* Mobile Header (Top) */}
       {!isActive('/login') && !isActive('/register') && (
-      <nav className="md:hidden bg-white shadow-sm sticky top-0 z-50 border-b border-slate-200">
+      <nav className="md:hidden bg-white shadow-sm sticky top-[var(--safe-top)] z-50 border-b border-slate-200">
         <div className="px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="text-lg font-extrabold text-blue-950 flex items-center gap-2 truncate">
-            <img src="/logo.jpg" alt="Logo" className="h-8 w-auto rounded-md" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }} />
-            Conecta Serviço
-          </Link>
+          {LOCKED_AUDIENCE ? (
+            <Link to="/" className="min-w-0">
+              <AppLogo size="sm" />
+            </Link>
+          ) : (
+            <Link to="/" className="text-lg font-extrabold text-blue-950 flex items-center gap-2 truncate">
+              <img src="/logo.jpg" alt="Logo" className="h-8 w-auto rounded-md" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }} />
+              Conecta Serviço
+            </Link>
+          )}
           
           {isAuthenticated ? (
              <div className="flex items-center gap-3">

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Conecta Serviço Pro</string>
-    <string name="title_activity_main">Conecta Serviço Pro</string>
+    <string name="app_name">Conecta Serviço Profissional</string>
+    <string name="title_activity_main">Conecta Serviço Profissional</string>
     <string name="package_name">com.conectaservico.pro</string>
     <string name="custom_url_scheme">com.conectaservico.pro</string>
 </resources>

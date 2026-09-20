@@ -115,7 +115,7 @@ const ChatsList = () => {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] flex bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="max-w-7xl mx-auto h-[calc(100vh-140px-var(--safe-top)-var(--safe-bottom))] md:h-[calc(100vh-100px)] flex bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       
       {/* Lista de Chats (Esquerda) */}
       <div className={`w-full md:w-1/3 lg:w-96 flex flex-col border-r border-slate-200 ${chatId ? 'hidden md:flex' : 'flex'}`}>

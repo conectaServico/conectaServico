@@ -18,6 +18,7 @@ import { markVerifiedFn, prepareProfessionalPhoneFn, callableErrorMessage } from
 import { useUserStore } from '@/store/userStore';
 import OtpInput from '@/components/OtpInput';
 import { LOCKED_AUDIENCE } from '@/config/appTarget';
+import AppLogo from '@/components/AppLogo';
 
 const RECAPTCHA_ID = 'recaptcha-container-register';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -378,17 +379,23 @@ const Register = () => {
     <div className="min-h-[80vh] flex items-center justify-center py-12">
       <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-2xl border border-gray-100">
         <div className="flex flex-col items-center mb-8">
-          <Link to="/">
-            <img
-              src="/logo.jpg"
-              alt="Conecta Serviço Logo"
-              className="h-16 w-auto rounded-xl mb-4 shadow-sm hover:scale-105 transition-transform"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = '/logo.png';
-              }}
-            />
-          </Link>
+          {LOCKED_AUDIENCE ? (
+            <div className="mb-4">
+              <AppLogo />
+            </div>
+          ) : (
+            <Link to="/">
+              <img
+                src="/logo.jpg"
+                alt="Conecta Serviço Logo"
+                className="h-16 w-auto rounded-xl mb-4 shadow-sm hover:scale-105 transition-transform"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = '/logo.png';
+                }}
+              />
+            </Link>
+          )}
           <h1 className="text-3xl font-extrabold text-gray-900">Crie sua conta</h1>
           <p className="text-gray-500 text-center mt-2">Preencha seus dados para encontrar os melhores profissionais ou oferecer seus serviços.</p>
         </div>

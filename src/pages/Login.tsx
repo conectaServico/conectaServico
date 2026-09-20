@@ -20,6 +20,8 @@ import { toE164BR } from '@/hooks/useVerified';
 import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
 import { maskPhone } from '@/utils/masks';
 import OtpInput from '@/components/OtpInput';
+import IntroBanners from '@/components/IntroBanners';
+import AppLogo from '@/components/AppLogo';
 import { Mail, Lock, Loader2, Eye, EyeOff, Phone, MessageSquare, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { User, TERMS_VERSION } from '@/types';
@@ -276,8 +278,21 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center max-w-md mx-auto px-4 sm:px-6">
-      {/* Logo Area */}
+    <div
+      className={`min-h-[85vh] flex flex-col max-w-md mx-auto px-4 sm:px-6 ${
+        LOCKED_AUDIENCE ? 'justify-start pt-5 pb-10' : 'justify-center'
+      }`}
+    >
+      {/* App nativo: marca compacta + banners de destaque logo na primeira tela */}
+      {LOCKED_AUDIENCE ? (
+        <>
+          <div className="flex justify-center mb-5">
+            <AppLogo />
+          </div>
+          <IntroBanners audience={LOCKED_AUDIENCE} />
+        </>
+      ) : (
+      /* Logo Area */
       <div className="flex flex-col items-center mb-8">
         <Link to="/">
           <img
@@ -297,6 +312,7 @@ const Login = () => {
             : 'Encontre o profissional ideal para a sua casa'}
         </p>
       </div>
+      )}
 
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 w-full">
         {/* Cliente x Profissional — no app nativo cada lado é um app separado, sem seletor */}

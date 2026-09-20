@@ -9,16 +9,38 @@
   --color-danger: #EF4444;
 }
 
+/* Áreas seguras (barra de status, barra de gestos, recorte da câmera). No app Android
+   (tela cheia) o Capacitor injeta --safe-area-inset-*; em WebView novo o env() também
+   vale — o max() cobre os dois sem somar em dobro. No navegador comum tudo isso é 0. */
+:root {
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+}
+
 body {
   background-color: #F8FAFC; /* slate-50 - do MVP */
   color: #0F172A; /* slate-900 - do MVP */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+/* Faixa branca fixa atrás da barra de status: o conteúdo que rola não passa por baixo dela. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-top);
+  background: #ffffff;
+  z-index: 60;
 }
 
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-bottom);
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

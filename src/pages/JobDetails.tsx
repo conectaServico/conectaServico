@@ -775,9 +775,9 @@ const RequestDetails = () => {
           Continua visível depois de desbloquear/mandar mensagem para o pro não perder
           o contato que pagou — o rodapé de "Liberar Pedido" some só quando já desbloqueou. */}
       {user?.role === 'professional' && request.status === 'OPEN' && (
-        <div className="bg-slate-50 min-h-screen pb-24 fixed inset-0 z-50 overflow-y-auto">
+        <div className="bg-slate-50 min-h-screen pb-24 pt-[var(--safe-top)] fixed inset-0 z-50 overflow-y-auto">
           {/* Header */}
-          <div className="bg-white px-4 py-4 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100 shadow-sm">
+          <div className="bg-white px-4 py-4 flex items-center justify-between sticky top-[var(--safe-top)] z-40 border-b border-slate-100 shadow-sm">
             <button onClick={() => navigate(-1)} className="p-1 text-slate-700">
               <ChevronLeft className="w-6 h-6" />
             </button>
