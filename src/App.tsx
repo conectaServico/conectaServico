@@ -46,6 +46,7 @@ const DocumentValidation = lazy(() => import('@/professional/DocumentValidation'
 const AdminPanel = lazy(() => import('@/admin/AdminPanel'));
 const BootstrapAdmin = lazy(() => import('@/pages/BootstrapAdmin'));
 const AuthAction = lazy(() => import('@/pages/AuthAction'));
+const DeleteAccount = lazy(() => import('@/pages/DeleteAccount'));
 
 function PageFallback() {
   return (
@@ -212,6 +213,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/auth/action" element={<AuthAction />} />
+            <Route path="/excluir-conta" element={<DeleteAccount />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/categoria/:slug" element={<CategoryPage />} />
