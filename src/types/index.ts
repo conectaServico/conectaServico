@@ -18,6 +18,7 @@ export interface User {
   neighborhood?: string;
   coinsBalance?: number;
   services?: string[]; // Categorias de serviços que o profissional presta
+  customServices?: string[]; // "Outros serviços" em texto livre (opcional, até 10) — só aparecem no perfil e na busca
   serviceCategories?: string[]; // Nomes das categorias-pai selecionadas (para filtro exato)
   bio?: string; // Biografia do profissional
   rating?: number; // Média de avaliações (do profissional, feitas por clientes)
@@ -66,6 +67,7 @@ export interface PublicProfile {
   uf?: string;
   bio?: string;
   services?: string[];
+  customServices?: string[];
   serviceCategories?: string[];
   rating?: number;
   reviewCount?: number;

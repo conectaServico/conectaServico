@@ -9,6 +9,9 @@ import { buildGeoFields } from '@/utils/geo';
 import { validateFacePhoto, preloadFaceApi } from '@/utils/faceCheck';
 import { deleteMyAccountFn, callableErrorMessage } from '@/services/api';
 import { Review } from '@/types';
+import ServicesPicker from '@/components/ServicesPicker';
+import OtherServicesInput from '@/components/OtherServicesInput';
+import { cleanCustomServices } from '@/utils/customServices';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -30,6 +33,9 @@ const Profile = () => {
   const [stateUF, setStateUF] = useState(user?.state || '');
   const [neighborhood, setNeighborhood] = useState(user?.neighborhood || '');
   const [radiusKm, setRadiusKm] = useState(user?.radiusKm ? user.radiusKm.toString() : '10');
+  const [services, setServices] = useState<string[]>(user?.services || []);
+  const [customServices, setCustomServices] = useState<string[]>(user?.customServices || []);
+  const [bio, setBio] = useState(user?.bio || '');
 
   const [loading, setLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
@@ -220,10 +226,16 @@ const Profile = () => {
           return;
         }
         updates.email = trimmedEmail;
-        // Não apagar os serviços (array) já existentes no banco
-        if (user.services) {
-          updates.services = user.services;
+        // Serviços da lista (usados no casamento de pedidos): pelo menos um.
+        if (services.length === 0) {
+          setError('Selecione pelo menos um serviço da lista.');
+          setLoading(false);
+          return;
         }
+        updates.services = services;
+        // Extras em texto livre e descrição do profissional (opcionais).
+        updates.customServices = cleanCustomServices(customServices);
+        updates.bio = bio.trim().slice(0, 800);
       }
 
       await updateDoc(doc(db, 'users', user.id), updates);
@@ -754,6 +766,40 @@ const Profile = () => {
                       <p className="text-sm text-slate-500 mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                         Mostraremos serviços abertos dentro dessa distância a partir do seu endereço principal.
                       </p>
+                    </div>
+
+                    <div className="mt-10 space-y-6">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Serviços que você presta</label>
+                        <p className="text-xs text-slate-500 mb-3">
+                          Você recebe avisos e vê os pedidos dessas categorias. Mantenha pelo menos um marcado.
+                        </p>
+                        <ServicesPicker
+                          selected={services}
+                          onToggle={(service) =>
+                            setServices((prev) =>
+                              prev.includes(service) ? prev.filter((x) => x !== service) : [...prev, service]
+                            )
+                          }
+                        />
+                      </div>
+
+                      <OtherServicesInput value={customServices} onChange={setCustomServices} />
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">
+                          Sobre você e suas especificações (opcional)
+                        </label>
+                        <textarea
+                          className="w-full p-4 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm"
+                          rows={5}
+                          maxLength={800}
+                          placeholder="Ex: 10 anos de experiência em reformas. Atendo aos sábados, faço orçamento sem compromisso, uso materiais de primeira linha..."
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value)}
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1 text-right">{bio.length}/800</p>
+                      </div>
                     </div>
                   </div>
               )}

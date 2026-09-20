@@ -11,13 +11,15 @@ import { Mail, Lock, User as UserIcon, Loader2, Phone, MapPin, Home as HomeIcon,
 import { User, UserRole, TERMS_VERSION } from '@/types';
 import { maskCEP, maskPhone } from '@/utils/masks';
 import { buildGeoFields } from '@/utils/geo';
-import { CATEGORY_MENUS } from '@/utils/categories';
 import { toE164BR } from '@/hooks/useVerified';
 import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
 import { markVerifiedFn, prepareProfessionalPhoneFn, callableErrorMessage } from '@/services/api';
 import { useUserStore } from '@/store/userStore';
 import OtpInput from '@/components/OtpInput';
 import { LOCKED_AUDIENCE } from '@/config/appTarget';
+import ServicesPicker from '@/components/ServicesPicker';
+import OtherServicesInput from '@/components/OtherServicesInput';
+import { cleanCustomServices } from '@/utils/customServices';
 import AppLogo from '@/components/AppLogo';
 
 const RECAPTCHA_ID = 'recaptcha-container-register';
@@ -55,6 +57,7 @@ const Register = () => {
   // Dados do Profissional
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bio, setBio] = useState('');
+  const [customServices, setCustomServices] = useState<string[]>([]);
 
   // Aceite dos Termos / Política de Privacidade (LGPD)
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -282,6 +285,7 @@ const Register = () => {
     coinsBalance: 0, // o bônus de boas-vindas do profissional é creditado pela Cloud Function onUserCreated
     services: role === 'professional' ? selectedServices : [],
     bio: role === 'professional' ? bio : '',
+    ...(role === 'professional' && customServices.length > 0 ? { customServices: cleanCustomServices(customServices) } : {}),
     rating: 0,
     reviewCount: 0,
     termsAcceptedAt: Date.now(),
@@ -760,37 +764,13 @@ const Register = () => {
               
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Quais serviços você presta? (Selecione 1 ou mais)</label>
-                <div className="space-y-4 max-h-80 overflow-y-auto pr-1 -mr-1">
-                  {CATEGORY_MENUS.map(cat => (
-                    <div key={cat.name}>
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">{cat.name}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {cat.items.map(service => {
-                          const isSelected = selectedServices.includes(service);
-                          return (
-                            <button
-                              key={service}
-                              type="button"
-                              onClick={() => toggleService(service)}
-                              className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                                isSelected
-                                  ? 'border-primary bg-primary/5 text-primary font-bold shadow-sm'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:border-primary/50'
-                              }`}
-                            >
-                              <span className="text-sm">{service}</span>
-                              {isSelected && <Check className="w-4 h-4" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ServicesPicker selected={selectedServices} onToggle={toggleService} />
               </div>
 
+              <OtherServicesInput value={customServices} onChange={setCustomServices} />
+
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Fale um pouco sobre sua experiência (Opcional)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Fale um pouco sobre sua experiência e suas especificações (Opcional)</label>
                 <textarea
                   className="w-full p-4 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none"
                   rows={4}

@@ -262,14 +262,34 @@ function buildSearchTokens(parts: Array<unknown>): string[] {
   return Array.from(out).slice(0, 60);
 }
 
+/** "Outros serviços" em texto livre: só textos, sem repetidos, 3–60 letras, até 10 (mesmas regras de src/utils/customServices.ts). */
+function cleanCustomServices(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of list) {
+    if (typeof item !== 'string') continue;
+    const s = item.replace(/\s+/g, ' ').trim().slice(0, 60);
+    const key = s.toLowerCase();
+    if (s.length < 3 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
 function toPublicProfile(uid: string, data: DocumentData): DocumentData {
   const out: DocumentData = { id: uid };
   for (const key of PUBLIC_PROFILE_FIELDS) {
     if (data[key] !== undefined) out[key] = data[key];
   }
+  const customServices = cleanCustomServices(data.customServices);
+  if (customServices.length > 0) out.customServices = customServices;
   out.searchTokens = buildSearchTokens([
     data.name,
     data.services,
+    customServices,
     data.serviceCategories,
     data.city,
     data.uf,

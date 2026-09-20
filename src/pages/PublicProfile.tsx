@@ -109,6 +109,21 @@ const PublicProfile = () => {
                     <span className="text-slate-500">Nenhum serviço especificado.</span>
                   )}
                 </div>
+                {profile.customServices && profile.customServices.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">Também faz</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.customServices.map((service) => (
+                        <span
+                          key={service}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm border border-slate-200"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
