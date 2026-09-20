@@ -145,10 +145,60 @@ function assertAuth(req: CallableRequest): string {
   return req.auth.uid;
 }
 
-/** Cria um aviso in-app para um usuário (central de notificações). Best-effort. */
+/**
+ * Push (FCM) para todos os aparelhos de um usuário — cliente ou profissional.
+ * Best-effort: nunca derruba quem chamou. Tokens mortos são removidos do perfil.
+ */
+async function sendPushToUser(
+  uid: string,
+  p: { title: string; body: string; link?: string; type?: string }
+): Promise<void> {
+  if (!uid) return;
+  try {
+    const userRef = db.doc(`users/${uid}`);
+    const snap = await userRef.get();
+    const raw = snap.data()?.fcmTokens;
+    const tokens: string[] = Array.isArray(raw) ? raw.filter((t) => typeof t === 'string' && t) : [];
+    if (!tokens.length) return;
+
+    const link = p.link || '';
+    const resp = await getMessaging().sendEach(
+      tokens.map((token) => ({
+        token,
+        notification: { title: p.title, body: p.body },
+        data: { type: p.type || 'notification', link },
+        android: { priority: 'high' as const },
+        // No navegador o FCM exige URL https completa.
+        ...(link.startsWith('/') ? { webpush: { fcmOptions: { link: `${SITE_URL}${link}` } } } : {}),
+      }))
+    );
+
+    const dead = tokens.filter((_, i) => {
+      const r = resp.responses[i];
+      if (r.success) return false;
+      const code = r.error?.code || '';
+      return (
+        code.includes('registration-token-not-registered') ||
+        code.includes('invalid-registration-token') ||
+        code.includes('invalid-argument')
+      );
+    });
+    if (dead.length) {
+      await userRef.update({ fcmTokens: FieldValue.arrayRemove(...dead) }).catch(() => undefined);
+    }
+  } catch (e) {
+    console.error('sendPushToUser falhou', uid, e);
+  }
+}
+
+/**
+ * Cria um aviso in-app para um usuário (central de notificações) e, por padrão, também
+ * manda push pros aparelhos dele. Best-effort. `push: false` quando quem chama já envia
+ * o próprio push (ex.: novos pedidos, que mostram a distância de cada profissional).
+ */
 async function notify(
   uid: string,
-  n: { type: string; title: string; body: string; link?: string }
+  n: { type: string; title: string; body: string; link?: string; push?: boolean }
 ): Promise<void> {
   if (!uid) return;
   try {
@@ -162,6 +212,9 @@ async function notify(
     });
   } catch (e) {
     console.error('notify falhou', uid, e);
+  }
+  if (n.push !== false) {
+    await sendPushToUser(uid, { title: n.title, body: n.body, link: n.link, type: n.type });
   }
 }
 
@@ -1510,7 +1563,7 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     // Aviso in-app para todo profissional compatível (independe de ter push ligado).
     await Promise.all(
       inRangePros.map((uid) =>
-        notify(uid, { type: 'new_lead', title, body: bodyFor(uid), link: `/requests/${requestId}` })
+        notify(uid, { type: 'new_lead', title, body: bodyFor(uid), link: `/requests/${requestId}`, push: false })
       )
     );
 
@@ -1561,6 +1614,37 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// 11-bis. Push de nova mensagem no chat — avisa quem recebeu (cliente ou profissional).
+// ---------------------------------------------------------------------------
+export const onMessageCreated = onDocumentCreated('messages/{messageId}', async (event) => {
+  const m = event.data?.data();
+  if (!m) return;
+  const chatId = String(m.chatId || '');
+  const senderId = String(m.senderId || '');
+  if (!chatId || !senderId) return;
+
+  // Não existe coleção de chats: o id é "<requestId>_<professionalId>" e o cliente é o dono do pedido.
+  const sep = chatId.indexOf('_');
+  if (sep <= 0) return;
+  const requestId = chatId.slice(0, sep);
+  const proId = chatId.slice(sep + 1);
+  const clientId = String((await db.doc(`serviceRequests/${requestId}`).get()).data()?.clientId || '');
+  const recipient = senderId === proId ? clientId : senderId === clientId ? proId : '';
+  if (!recipient) return;
+
+  const sender = (await db.doc(`publicProfiles/${senderId}`).get()).data();
+  const firstName = String(sender?.name || 'Alguém').split(' ')[0];
+  const body = m.type === 'image' ? '📷 Enviou uma foto' : String(m.text || '').slice(0, 120) || 'Nova mensagem';
+
+  await sendPushToUser(recipient, {
+    title: `Nova mensagem de ${firstName}`,
+    body,
+    link: `/chats/${chatId}`,
+    type: 'chat_message',
+  });
+});
 
 // ---------------------------------------------------------------------------
 // 12. Excluir a própria conta (LGPD + exigência das lojas de apps)

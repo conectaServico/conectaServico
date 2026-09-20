@@ -20,6 +20,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Ícone das notificações (silhueta branca da logo; o ícone colorido do app viraria um quadrado branco) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

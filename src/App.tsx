@@ -3,7 +3,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/services/firebase';
-import { ensurePushIfGranted } from '@/services/push';
+import { ensurePushIfGranted, onForegroundPush, onPushTap } from '@/services/push';
 import { useUserStore } from '@/store/userStore';
 import { User } from '@/types';
 
@@ -11,6 +11,7 @@ import { User } from '@/types';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ScrollToTop from '@/components/ScrollToTop';
+import AppOnboarding, { markOnboardingSeen, onboardingSeen } from '@/components/AppOnboarding';
 import toast, { Toaster } from 'react-hot-toast';
 import { LOCKED_AUDIENCE } from '@/config/appTarget';
 
@@ -59,15 +60,52 @@ function App() {
   const setVerification = useUserStore((state) => state.setVerification);
   const currentUser = useUserStore((state) => state.user);
   const [initializing, setInitializing] = useState(isFirebaseConfigured);
+  // Boas-vindas do app (só nos apps cliente/profissional, só na 1ª abertura).
+  const [showIntro, setShowIntro] = useState(() => !!LOCKED_AUDIENCE && !onboardingSeen());
 
-  // Profissional já logado e com permissão de notificação concedida: reconfirma o
-  // token de push a cada sessão (o token do FCM pode rotacionar). Sem permissão,
-  // não faz nada aqui — o botão "Ativar avisos" no feed cuida do opt-in.
+  // Cliente ou profissional logado e com permissão de notificação concedida: reconfirma
+  // o token de push a cada sessão (o token do FCM pode rotacionar). Sem permissão, não
+  // faz nada aqui — a tela de boas-vindas do app e o botão "Ativar avisos" cuidam do opt-in.
   useEffect(() => {
-    if (currentUser?.role === 'professional' && currentUser.id) {
+    if (currentUser?.id) {
       ensurePushIfGranted(currentUser.id);
     }
-  }, [currentUser?.id, currentUser?.role]);
+  }, [currentUser?.id]);
+
+  // Aviso com o app aberto vira um toast; toque numa notificação do sistema abre a tela do aviso.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let alive = true;
+    let offForeground: () => void = () => undefined;
+    let offTap: () => void = () => undefined;
+
+    onForegroundPush((m) => {
+      const text = m.title ? `${m.title}${m.body ? ` — ${m.body}` : ''}` : m.body || 'Você tem um novo aviso';
+      toast(text, { icon: '🔔', duration: 6000 });
+    }).then((off) => (alive ? (offForeground = off) : off()));
+
+    onPushTap((data) => {
+      const link = typeof data.link === 'string' ? data.link : '';
+      if (link.startsWith('/')) {
+        window.history.pushState({}, '', link);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    }).then((off) => (alive ? (offTap = off) : off()));
+
+    return () => {
+      alive = false;
+      offForeground();
+      offTap();
+    };
+  }, [currentUser?.id]);
+
+  // Quem já está logado não precisa das boas-vindas.
+  useEffect(() => {
+    if (currentUser && showIntro) {
+      markOnboardingSeen();
+      setShowIntro(false);
+    }
+  }, [currentUser, showIntro]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -119,6 +157,18 @@ function App() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  if (showIntro && LOCKED_AUDIENCE && !currentUser) {
+    return (
+      <AppOnboarding
+        audience={LOCKED_AUDIENCE}
+        onFinish={() => {
+          markOnboardingSeen();
+          setShowIntro(false);
+        }}
+      />
     );
   }
 

@@ -7,6 +7,7 @@ import { useUserStore } from '@/store/userStore';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 import { CATEGORY_MENUS, imageForService } from '@/utils/categories';
 import { normalize } from '@/utils/search';
+import PushOptInBanner from '@/components/PushOptInBanner';
 
 // Todos os serviços de todas as categorias, achatados — usado só pela busca
 // da home (digitar "eletricista" já sugere direto, sem precisar navegar por
@@ -152,6 +153,7 @@ const ClientHome = () => {
 
         {searching ? null : (
         <>
+        <PushOptInBanner label="Ativar avisos de propostas e mensagens" className="mb-2" />
         <BannerCarousel banners={clientBanners} />
 
         {/* Convite pro pedido (só depois de saber se é o primeiro; reserva a altura pra não pular). */}

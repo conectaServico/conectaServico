@@ -6,13 +6,13 @@ import { JobRequest, Urgency } from '@/types';
 import { geohashQueryBounds, distanceBetween } from '@/utils/geo';
 import { CATEGORIES_MAP } from '@/utils/categories';
 import { unlockCostFor } from '@/utils/unlockPricing';
-import { registerForPush, pushSupported, pushPermission, type PushPermission } from '@/services/push';
+import PushOptInBanner from '@/components/PushOptInBanner';
 import { useProOnboarding } from '@/hooks/useProOnboarding';
 import ProOnboarding from '@/components/ProOnboarding';
 import BannerCarousel, { type Banner } from '@/components/BannerCarousel';
 import {
   MapPin, Search, ShieldCheck, Coins, User as UserIcon, Phone, ChevronRight, Lock,
-  SlidersHorizontal, BellRing, X, ArrowUpDown, AlertTriangle, Trophy, Check,
+  SlidersHorizontal, X, ArrowUpDown, AlertTriangle, Trophy, Check,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -82,23 +82,6 @@ const ProHome = () => {
       await setDoc(doc(db, 'users', user.id, 'dismissedLeads', requestId), { created_at: Date.now() });
     } catch (e) {
       console.error('Falha ao ocultar lead:', e);
-    }
-  };
-
-  // Push de novos pedidos
-  const [pushState, setPushState] = useState<PushPermission>(() => pushPermission());
-  const [pushBusy, setPushBusy] = useState(false);
-  const enablePush = async () => {
-    if (!user?.id) return;
-    setPushBusy(true);
-    try {
-      const token = await registerForPush(user.id);
-      setPushState(pushPermission());
-      toast[token ? 'success' : 'error'](
-        token ? 'Avisos de novos pedidos ativados!' : 'Não foi possível ativar os avisos agora.'
-      );
-    } finally {
-      setPushBusy(false);
     }
   };
 
@@ -341,16 +324,7 @@ const ProHome = () => {
           </Link>
         </div>
 
-        {pushSupported() && pushState === 'default' && (
-          <button
-            onClick={enablePush}
-            disabled={pushBusy}
-            className="mb-4 w-full flex items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary border border-primary/20 px-4 py-3 font-bold hover:bg-primary/15 transition-colors disabled:opacity-60"
-          >
-            <BellRing className="w-4 h-4" />
-            {pushBusy ? 'Ativando…' : 'Ativar avisos de novos pedidos'}
-          </button>
-        )}
+        <PushOptInBanner label="Ativar avisos de novos pedidos" className="mb-4" />
 
         {!geoActive && (
           <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3">

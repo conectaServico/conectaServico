@@ -36,6 +36,35 @@ export function pushPermission(): PushPermission {
   return Notification.permission as PushPermission;
 }
 
+/** Permissão atual de verdade (no app nativo precisa perguntar pro Android; `pushPermission` só sabe da web). */
+export async function getPushPermission(): Promise<PushPermission> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const r = await PushNotifications.checkPermissions();
+      return r.receive === 'granted' ? 'granted' : r.receive === 'denied' ? 'denied' : 'default';
+    }
+    return pushPermission();
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/** Mostra o pedido de permissão do sistema (Android 13+ / navegador). Só a permissão — o token é salvo depois do login. */
+export async function requestPushPermission(): Promise<PushPermission> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const r = await PushNotifications.requestPermissions();
+      return r.receive === 'granted' ? 'granted' : r.receive === 'denied' ? 'denied' : 'default';
+    }
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+    return (await Notification.requestPermission()) as PushPermission;
+  } catch {
+    return 'unsupported';
+  }
+}
+
 async function saveToken(userId: string, token: string): Promise<void> {
   await updateDoc(doc(db, 'users', userId), {
     fcmTokens: arrayUnion(token),
@@ -129,7 +158,7 @@ export async function registerForPush(userId: string): Promise<string | null> {
 export async function ensurePushIfGranted(userId: string): Promise<void> {
   try {
     if (!userId) return;
-    if (Capacitor.isNativePlatform() || pushPermission() === 'granted') {
+    if ((await getPushPermission()) === 'granted') {
       await registerForPush(userId);
     }
   } catch {
@@ -165,6 +194,26 @@ export async function onForegroundPush(
       });
     });
     return unsub;
+  } catch {
+    return () => undefined;
+  }
+}
+
+/** Toque numa notificação do sistema (só no app nativo): devolve os dados enviados junto (ex.: `link`). */
+export async function onPushTap(cb: (data: Record<string, unknown>) => void): Promise<() => void> {
+  try {
+    if (!Capacitor.isNativePlatform()) return () => undefined;
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const h = await PushNotifications.addListener('pushNotificationActionPerformed', (a) => {
+      cb((a.notification?.data as Record<string, unknown>) || {});
+    });
+    return () => {
+      try {
+        h.remove();
+      } catch {
+        /* noop */
+      }
+    };
   } catch {
     return () => undefined;
   }
