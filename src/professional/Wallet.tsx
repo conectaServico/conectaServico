@@ -100,25 +100,21 @@ const Wallet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const getTransactionIcon = (type: string) => {
+  // O servidor grava saídas (desbloqueio, desconto manual) como valor NEGATIVO:
+  // sinal e cor vêm do próprio valor, não do tipo (senão sai "--10").
+  const getTransactionIcon = (type: string, amount: number) => {
+    if (amount < 0) return <ArrowDownRight className="w-5 h-5 text-danger" />;
     switch (type) {
       case 'BONUS_SIGNUP': return <Gift className="w-5 h-5 text-emerald-500" />;
-      case 'UNLOCK_CONTACT': return <ArrowDownRight className="w-5 h-5 text-danger" />;
       case 'REFUND': return <ArrowUpRight className="w-5 h-5 text-emerald-500" />;
       case 'PURCHASE': return <Coins className="w-5 h-5 text-primary" />;
       default: return <Coins className="w-5 h-5 text-primary" />;
     }
   };
 
-  const getTransactionColor = (type: string) => {
-    if (type === 'UNLOCK_CONTACT') return 'text-danger';
-    return 'text-emerald-500';
-  };
+  const getTransactionColor = (amount: number) => (amount < 0 ? 'text-danger' : 'text-emerald-500');
 
-  const getTransactionPrefix = (type: string) => {
-    if (type === 'UNLOCK_CONTACT') return '-';
-    return '+';
-  };
+  const formatTransactionAmount = (amount: number) => (amount < 0 ? `-${Math.abs(amount)}` : `+${amount}`);
 
   const handleBuyDiamonds = () => {
     setIsStoreOpen(true);
@@ -242,17 +238,17 @@ const Wallet = () => {
               <div key={t.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    t.type === 'UNLOCK_CONTACT' ? 'bg-danger/10' : 'bg-emerald-50'
+                    t.amount < 0 ? 'bg-danger/10' : 'bg-emerald-50'
                   }`}>
-                    {getTransactionIcon(t.type)}
+                    {getTransactionIcon(t.type, t.amount)}
                   </div>
                   <div>
                     <p className="font-bold text-slate-900">{t.description}</p>
                     <p className="text-sm text-slate-500">{format(t.created_at, "dd 'de' MMM 'às' HH:mm", { locale: ptBR })}</p>
                   </div>
                 </div>
-                <div className={`text-xl font-extrabold ${getTransactionColor(t.type)}`}>
-                  {getTransactionPrefix(t.type)}{t.amount}
+                <div className={`text-xl font-extrabold ${getTransactionColor(t.amount)}`}>
+                  {formatTransactionAmount(t.amount)}
                 </div>
               </div>
             ))}
