@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/services/firebase';
 import { ensurePushIfGranted } from '@/services/push';
@@ -11,7 +11,8 @@ import { User } from '@/types';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ScrollToTop from '@/components/ScrollToTop';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
+import { LOCKED_AUDIENCE } from '@/config/appTarget';
 
 // Pages — carregadas sob demanda (code-splitting por rota)
 const Login = lazy(() => import('@/pages/Login'));
@@ -88,7 +89,21 @@ function App() {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         // Sessão sem doc = cadastro (por telefone) ainda não finalizado — o app
         // trata como deslogado; os fluxos de Login/Register retomam o wizard.
-        setUser(userDoc.exists() ? (userDoc.data() as User) : null);
+        const profile = userDoc.exists() ? (userDoc.data() as User) : null;
+
+        // App nativo é um por lado (cliente / profissional): conta do outro lado não fica logada.
+        if (profile && LOCKED_AUDIENCE && profile.role !== LOCKED_AUDIENCE) {
+          toast.error(
+            profile.role === 'professional'
+              ? 'Essa conta é de profissional. Use o app Conecta Serviço Pro.'
+              : 'Essa conta é de cliente. Use o app Conecta Serviço.',
+            { duration: 6000 }
+          );
+          await signOut(auth); // dispara este callback de novo, já deslogado
+          return;
+        }
+
+        setUser(profile);
       } else {
         setUser(null);
         setVerification({ emailVerified: false, phoneVerified: false, signInProvider: null });

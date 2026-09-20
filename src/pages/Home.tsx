@@ -1,11 +1,12 @@
 import { useUserStore } from '@/store/userStore';
 import { Star, Smartphone, Clock, ThumbsUp, Coins, ShieldCheck, Wrench, Zap, Hammer, MessageSquare, CheckCircle, ChevronLeft, ChevronRight, Search, Laptop, MapPin, Percent, HelpCircle, Users } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useRef } from 'react';
 import ProHome from '@/professional/ProHome';
 import ClientHome from '@/client/ClientHome';
 import { useAudienceStore } from '@/store/audienceStore';
 import { CATEGORY_MENUS } from '@/utils/categories';
+import { isNativeApp } from '@/config/appTarget';
 
 // Selos de confiança rápidos — fatos reais do produto, sem números inventados.
 const CLIENT_STATS = [
@@ -74,6 +75,12 @@ const Home = () => {
     } else {
       return <ClientHome />;
     }
+  }
+
+  // App nativo (cliente ou profissional, cada um no seu app): sem o site de
+  // marketing — deslogado, o app abre direto na tela de login.
+  if (isNativeApp()) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

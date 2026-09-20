@@ -20,7 +20,11 @@
     "preview": "vite preview",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
-    "emulators": "firebase emulators:start"
+    "emulators": "firebase emulators:start",
+    "app:client:apk": "node scripts/build-app.mjs client apk",
+    "app:pro:apk": "node scripts/build-app.mjs professional apk",
+    "app:client:aab": "node scripts/build-app.mjs client aab",
+    "app:pro:aab": "node scripts/build-app.mjs professional aab"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.2.0",

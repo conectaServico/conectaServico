@@ -17,6 +17,7 @@ import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
 import { markVerifiedFn, prepareProfessionalPhoneFn, callableErrorMessage } from '@/services/api';
 import { useUserStore } from '@/store/userStore';
 import OtpInput from '@/components/OtpInput';
+import { LOCKED_AUDIENCE } from '@/config/appTarget';
 
 const RECAPTCHA_ID = 'recaptcha-container-register';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,9 +34,12 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  // Tipo de conta: pode vir pré-selecionado pela home (/register?role=professional).
+  // Tipo de conta: travado no app nativo (LOCKED_AUDIENCE); no site, vem
+  // pré-selecionado pela home (/register?role=professional).
   const [role, setRole] = useState<UserRole>(
-    new URLSearchParams(window.location.search).get('role') === 'professional' ? 'professional' : 'client'
+    LOCKED_AUDIENCE
+      ? LOCKED_AUDIENCE
+      : new URLSearchParams(window.location.search).get('role') === 'professional' ? 'professional' : 'client'
   );
   
   // Endereço
@@ -389,38 +393,42 @@ const Register = () => {
           <p className="text-gray-500 text-center mt-2">Preencha seus dados para encontrar os melhores profissionais ou oferecer seus serviços.</p>
         </div>
 
-        {/* Tipo de Conta Toggle — travado depois que o cadastro começa */}
-        <div className="flex p-1 bg-gray-100 rounded-xl mb-3 max-w-md mx-auto">
-          <button
-            type="button"
-            disabled={otpSent || step > 1}
-            onClick={() => setRole('client')}
-            className={`flex-1 min-w-0 px-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold leading-tight transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-              role === 'client'
-                ? 'bg-white text-primary shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Quero ser cliente
-          </button>
-          <button
-            type="button"
-            disabled={otpSent || step > 1}
-            onClick={() => setRole('professional')}
-            className={`flex-1 min-w-0 px-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold leading-tight transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-              role === 'professional'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Quero ser profissional
-          </button>
-        </div>
-        <p className="text-center text-xs text-gray-500 mb-8">
-          {role === 'client'
-            ? 'Cliente entra com e-mail e senha.'
-            : 'Profissional entra pelo celular — enviamos um código por SMS.'}
-        </p>
+        {/* Tipo de Conta Toggle — oculto no app nativo (cada app já é só cliente ou só profissional); travado depois que o cadastro começa */}
+        {!LOCKED_AUDIENCE && (
+          <>
+            <div className="flex p-1 bg-gray-100 rounded-xl mb-3 max-w-md mx-auto">
+              <button
+                type="button"
+                disabled={otpSent || step > 1}
+                onClick={() => setRole('client')}
+                className={`flex-1 min-w-0 px-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold leading-tight transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  role === 'client'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Quero ser cliente
+              </button>
+              <button
+                type="button"
+                disabled={otpSent || step > 1}
+                onClick={() => setRole('professional')}
+                className={`flex-1 min-w-0 px-1 py-2.5 rounded-lg text-xs sm:text-sm font-bold leading-tight transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  role === 'professional'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Quero ser profissional
+              </button>
+            </div>
+            <p className="text-center text-xs text-gray-500 mb-8">
+              {role === 'client'
+                ? 'Cliente entra com e-mail e senha.'
+                : 'Profissional entra pelo celular — enviamos um código por SMS.'}
+            </p>
+          </>
+        )}
 
         {/* Etapas Progress Bar */}
         <div className="flex items-center justify-between mb-8 max-w-sm mx-auto">

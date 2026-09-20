@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
 import Navbar from './Navbar';
 import VerificationBanner from './VerificationBanner';
-import { Link, useLocation } from 'react-router-dom';
-import { Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
+import { isNativeApp } from '@/config/appTarget';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,19 +13,32 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const { isAuthenticated } = useUserStore();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  // App nativo deslogado: só login/cadastro (e Termos/Privacidade), sem navbar/rodapé de site.
+  const hideChrome = isNativeApp() && !isAuthenticated;
 
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${isAuthenticated ? 'pb-16 md:pb-0' : ''}`}>
-      <Navbar />
-      <VerificationBanner />
-      <main className="flex-grow container mx-auto px-4 py-8">
+      {!hideChrome && <Navbar />}
+      {!hideChrome && <VerificationBanner />}
+      {/* Sem navbar no app deslogado: páginas fora do login/cadastro (Termos, Privacidade…) precisam de um jeito de voltar. */}
+      {hideChrome && !isAuthPage && (
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 px-4 py-3 text-sm font-bold text-primary"
+        >
+          <ArrowLeft className="w-4 h-4" /> Voltar
+        </button>
+      )}
+      <main className={hideChrome ? 'flex-grow' : 'flex-grow container mx-auto px-4 py-8'}>
         {children}
       </main>
-      
-      {/* Footer Profissional - Oculto para usuários logados e nas páginas de auth */}
-      {!isAuthenticated && !isAuthPage && (
+
+      {/* Footer Profissional - Oculto para usuários logados, páginas de auth e app nativo */}
+      {!isAuthenticated && !isAuthPage && !hideChrome && (
         <footer className="bg-slate-900 pt-16 pb-8 border-t border-slate-800">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">

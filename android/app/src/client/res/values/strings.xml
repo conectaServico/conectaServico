@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Conecta Serviço</string>
+    <string name="title_activity_main">Conecta Serviço</string>
+    <string name="package_name">com.conectaservico.app</string>
+    <string name="custom_url_scheme">com.conectaservico.app</string>
+</resources>

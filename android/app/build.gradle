@@ -1,12 +1,21 @@
 apply plugin: 'com.android.application'
 
+// Assinatura de release: android/keystore.properties (fora do git) com
+// storeFile, storePassword, keyAlias, keyPassword. Sem ele, só builds debug funcionam.
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "com.conectaservico.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.conectaservico.app"
+        // applicationId, nome e ícone vêm do flavor (cliente x profissional) abaixo.
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // A cada envio pra Play Store, aumente o versionCode (deve ser sempre maior que o anterior).
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -16,10 +25,36 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Dois apps a partir do mesmo código: o front é gerado com VITE_APP_AUDIENCE
+    // (client|professional) — ver scripts/build-app.mjs.
+    flavorDimensions "audience"
+    productFlavors {
+        client {
+            dimension "audience"
+            applicationId "com.conectaservico.app"
+        }
+        professional {
+            dimension "audience"
+            applicationId "com.conectaservico.pro"
+        }
+    }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

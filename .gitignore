@@ -52,3 +52,8 @@ android/keystore.properties
 *.njsproj
 *.sln
 *.sw?
+
+# App Android: configs do Firebase e assinatura ficam só na máquina
+android/app/google-services.json
+android/app/google-services.client.json.bak
+dist-app

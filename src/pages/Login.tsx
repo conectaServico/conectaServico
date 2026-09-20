@@ -15,6 +15,7 @@ import { auth, db } from '@/services/firebase';
 import { requestPasswordReset } from '@/utils/passwordReset';
 import { useUserStore } from '@/store/userStore';
 import { useAudienceStore } from '@/store/audienceStore';
+import { LOCKED_AUDIENCE } from '@/config/appTarget';
 import { toE164BR } from '@/hooks/useVerified';
 import { sendOtp, clearRecaptcha } from '@/utils/phoneAuth';
 import { maskPhone } from '@/utils/masks';
@@ -290,11 +291,16 @@ const Login = () => {
           />
         </Link>
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Conecta Serviço</h1>
-        <p className="text-slate-500 mt-2 text-center text-lg">Encontre o profissional ideal para a sua casa</p>
+        <p className="text-slate-500 mt-2 text-center text-lg">
+          {LOCKED_AUDIENCE === 'professional'
+            ? 'Encontre novos clientes perto de você'
+            : 'Encontre o profissional ideal para a sua casa'}
+        </p>
       </div>
 
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 w-full">
-        {/* Cliente x Profissional */}
+        {/* Cliente x Profissional — no app nativo cada lado é um app separado, sem seletor */}
+        {!LOCKED_AUDIENCE && (
         <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
           <button
             type="button"
@@ -321,6 +327,7 @@ const Login = () => {
             Sou profissional
           </button>
         </div>
+        )}
 
         {error && (
           <div className="bg-danger/10 text-danger p-4 rounded-xl text-sm mb-6 border border-danger/20 font-medium">

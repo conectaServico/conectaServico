@@ -204,10 +204,21 @@ const VerifyAccount = () => {
   return (
     <div className="max-w-lg mx-auto pt-8 pb-16 px-4">
       <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
-          <ShieldCheck className="w-7 h-7" />
+        <div className="relative mb-3">
+          <img
+            src="/logo.jpg"
+            alt="Conecta Serviço"
+            className="w-16 h-16 rounded-2xl shadow-md object-cover"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/logo.png';
+            }}
+          />
+          <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center border-2 border-white">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900">Verifique sua conta</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">Só falta confirmar sua conta</h1>
         <p className="text-slate-500 mt-1">
           Para publicar pedidos, enviar propostas, desbloquear contatos ou comprar diamantes,
           confirme seu e-mail. O celular é opcional.
