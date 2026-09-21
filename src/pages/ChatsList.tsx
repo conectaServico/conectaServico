@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
-import { MessageSquare, Loader2, User as UserIcon } from 'lucide-react';
+import { MessageSquare, User as UserIcon } from 'lucide-react';
+import { RowsSkeleton } from '@/components/Skeleton';
 import { Link, Outlet, useParams } from 'react-router-dom';
 import { Proposal, ServiceRequest, PublicProfile, Message } from '@/types';
 
@@ -112,7 +113,7 @@ const ChatsList = () => {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [chats, user?.id, chatId]);
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
+  if (loading) return <div className="max-w-7xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden" aria-busy="true"><RowsSkeleton count={6} /></div>;
 
   return (
     <div className="max-w-7xl mx-auto h-[calc(100vh-140px-var(--safe-top)-var(--safe-bottom))] md:h-[calc(100vh-100px)] flex bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

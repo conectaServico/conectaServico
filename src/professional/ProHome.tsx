@@ -6,6 +6,8 @@ import { JobRequest, Urgency } from '@/types';
 import { geohashQueryBounds, distanceBetween } from '@/utils/geo';
 import { CATEGORIES_MAP } from '@/utils/categories';
 import { unlockCostFor } from '@/utils/unlockPricing';
+import { isRequestFull } from '@/utils/requestLifecycle';
+import { ListSkeleton } from '@/components/Skeleton';
 import PushOptInBanner from '@/components/PushOptInBanner';
 import { useProOnboarding } from '@/hooks/useProOnboarding';
 import ProOnboarding from '@/components/ProOnboarding';
@@ -235,6 +237,7 @@ const ProHome = () => {
   // Filtros client-side: texto, categoria do profissional e (no fallback) localização.
   const filteredJobs = jobs.filter((job) => {
     if (dismissed.has(job.id)) return false;
+    if (isRequestFull(job.unlockCount)) return false; // já tem os 3 profissionais
 
     const matchesSearch =
       q === '' ||
@@ -372,9 +375,7 @@ const ProHome = () => {
         {/* Main Content (Lista de Serviços) */}
         <div className="flex-1">
           {loading ? (
-            <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-400"></div>
-            </div>
+            <ListSkeleton count={4} />
           ) : sortedJobs.length > 0 ? (
             <div className="flex flex-col gap-4">
               {sortedJobs.map(job => {

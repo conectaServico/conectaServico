@@ -8,6 +8,7 @@ import * as admin from 'firebase-admin';
 import { FieldValue, AggregateField, type DocumentData, type QuerySnapshot } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import nodemailer from 'nodemailer';
+import { GoogleAuth } from 'google-auth-library';
 import { passwordResetEmail, SITE_URL, SUPPORT_EMAIL } from './emailTemplates';
 
 admin.initializeApp();
@@ -113,7 +114,7 @@ function unlockCostFor(r: UnlockPricingInput): number {
 
 const SIGNUP_BONUS = 100;
 const MAX_UNLOCKS = 3;
-const REQUEST_EXPIRY_DAYS = 2; // pedido aberto sem proposta aceita expira depois disso
+const REQUEST_EXPIRY_DAYS = 3; // todo pedido sai do ar depois disso, mesmo com profissional já escolhido
 const DEFAULT_RADIUS_KM = 25;
 const MAX_OPEN_REQUESTS_PER_CLIENT = 15;
 const REFERRAL_BONUS = 100; // diamantes para quem indicou, quando o indicado verifica a conta
@@ -402,7 +403,7 @@ export const unlockContact = onCall(wrapCallable(async (req) => {
   const proRef = db.doc(`users/${uid}`);
   const reqRef = db.doc(`serviceRequests/${requestId}`);
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     // --- todas as leituras primeiro ---
     const proSnap = await tx.get(proRef);
     const reqSnap = await tx.get(reqRef);
@@ -491,8 +492,24 @@ export const unlockContact = onCall(wrapCallable(async (req) => {
       cost,
       newBalance: ((pro.coinsBalance as number) ?? 0) - cost,
       ...contact(),
+      // uso interno (não vai pro app): o 3º profissional completa o pedido
+      _becameFull: ((reqData.unlockCount as number) ?? 0) + 1 >= MAX_UNLOCKS,
+      _clientId: String(reqData.clientId || ''),
+      _label: (reqData.subcategory as string) || (reqData.category as string) || 'serviço',
     };
   });
+
+  const { _becameFull, _clientId, _label, ...publicResult } = result as Record<string, unknown>;
+  if (_becameFull && _clientId) {
+    // Pedido "completo": some do feed dos outros profissionais; o cliente ainda escolhe entre os 3.
+    await notify(String(_clientId), {
+      type: 'request_full',
+      title: 'Seu pedido já tem 3 profissionais',
+      body: `Três profissionais se interessaram pelo seu pedido de ${String(_label)}. Confira e escolha o melhor!`,
+      link: `/requests/${requestId}`,
+    });
+  }
+  return publicResult;
 }));
 
 // ---------------------------------------------------------------------------
@@ -649,39 +666,78 @@ export const deleteRequest = onCall(wrapCallable(async (req) => {
 }));
 
 // ---------------------------------------------------------------------------
-// 3c-bis. Expira pedidos abertos há mais de REQUEST_EXPIRY_DAYS sem proposta
-// aceita — evita pedido "morto" acumulando no feed dos profissionais pra
-// sempre. Roda de hora em hora; cliente pode reabrir depois (reopenRequest).
+// 3c-bis. Prazo de vida dos pedidos: REQUEST_EXPIRY_DAYS dias depois de criado o
+// pedido some, mesmo que o cliente já tenha escolhido um profissional.
+//  - aberto (ninguém escolhido)  -> EXPIRADO (cliente pode reabrir: reopenRequest);
+//  - em negociação / em andamento -> CONCLUÍDO automaticamente (libera a avaliação).
+// Roda de hora em hora.
 // ---------------------------------------------------------------------------
 export const expireOldRequests = onSchedule('every 1 hours', async () => {
   const cutoff = Date.now() - REQUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-  const snap = await db
+  const now = Date.now();
+
+  // 1) Abertos sem ninguém escolhido -> EXPIRADO.
+  const openSnap = await db
     .collection('serviceRequests')
     .where('status', '==', 'OPEN')
     .where('created_at', '<', cutoff)
     .get();
-  if (snap.empty) return;
+  // 2) Com profissional escolhido (negociando / em andamento) -> CONCLUÍDO sozinho.
+  const [negotiatingSnap, inProgressSnap] = await Promise.all(
+    ['NEGOTIATING', 'IN_PROGRESS'].map((status) =>
+      db.collection('serviceRequests').where('status', '==', status).where('created_at', '<', cutoff).get()
+    )
+  );
+  const closing = [...negotiatingSnap.docs, ...inProgressSnap.docs];
+  if (openSnap.empty && closing.length === 0) return;
 
-  const now = Date.now();
   const writer = db.bulkWriter();
-  for (const doc of snap.docs) {
+  for (const doc of openSnap.docs) {
     writer.update(doc.ref, { status: 'EXPIRED', updated_at: now });
+  }
+  for (const doc of closing) {
+    writer.update(doc.ref, { status: 'COMPLETED', completed_at: now, autoCompleted: true, updated_at: now });
   }
   await writer.close();
 
-  await Promise.all(
-    snap.docs.map((doc) => {
+  const label = (r: Record<string, unknown>) => (r.subcategory as string) || (r.category as string) || 'serviço';
+
+  await Promise.all([
+    ...openSnap.docs.map((doc) => {
       const r = doc.data() as Record<string, unknown>;
       const clientId = String(r.clientId || '');
       if (!clientId) return Promise.resolve();
       return notify(clientId, {
         type: 'request_expired',
         title: 'Pedido expirado',
-        body: `Seu pedido de ${(r.subcategory as string) || (r.category as string) || 'serviço'} expirou após ${REQUEST_EXPIRY_DAYS} dias sem ninguém escolhido. Você pode reabrir quando quiser.`,
+        body: `Seu pedido de ${label(r)} expirou após ${REQUEST_EXPIRY_DAYS} dias sem ninguém escolhido. Você pode reabrir quando quiser.`,
         link: `/requests/${doc.id}`,
       });
-    })
-  );
+    }),
+    ...closing.flatMap((doc) => {
+      const r = doc.data() as Record<string, unknown>;
+      const clientId = String(r.clientId || '');
+      const proId = String(r.acceptedProfessionalId || '');
+      return [
+        clientId
+          ? notify(clientId, {
+              type: 'request_completed',
+              title: 'Pedido concluído',
+              body: `Seu pedido de ${label(r)} foi encerrado após ${REQUEST_EXPIRY_DAYS} dias. Avalie o profissional!`,
+              link: `/requests/${doc.id}`,
+            })
+          : Promise.resolve(),
+        proId
+          ? notify(proId, {
+              type: 'request_completed',
+              title: 'Pedido concluído',
+              body: `O pedido de ${label(r)} foi encerrado após ${REQUEST_EXPIRY_DAYS} dias.`,
+              link: `/requests/${doc.id}`,
+            })
+          : Promise.resolve(),
+      ];
+    }),
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -1613,6 +1669,145 @@ export const notifyProfessionalsOnNewRequest = onDocumentCreated(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// 10-bis. Compra de diamantes pelo Google Play Billing (só o app Android do profissional).
+// A Google exige o Play Billing pra moeda virtual comprada dentro do app. O app faz a
+// compra, manda o token pra cá, e a gente confere com a Google antes de creditar
+// (nunca confia no app). O site continua no Mercado Pago.
+// ---------------------------------------------------------------------------
+const PLAY_PACKAGE_NAME = 'com.conectaservico.pro';
+// Preço no app = preço do site + 20% (cobre a taxa da Google), arredondado pra cima.
+// Os IDs são os mesmos dos produtos criados na Play Console; o preço lá tem que ser igual.
+const PLAY_PRODUCTS: Record<string, { diamonds: number; price: number }> = {
+  pkg_50: { diamonds: 50, price: 11.9 },
+  pkg_150: { diamonds: 150, price: 33.9 },
+  pkg_300: { diamonds: 300, price: 59.9 },
+};
+
+// Usa a conta de serviço da própria function (Application Default Credentials) — ela
+// precisa ser convidada na Play Console (Usuários e permissões) e a API ativada no projeto.
+const playAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/androidpublisher'] });
+
+/** Identificador ofuscado da conta que o app manda na compra (mesmo cálculo de src/services/playBilling.ts). */
+function playAccountId(uid: string): string {
+  return crypto.createHash('sha256').update(uid).digest('hex').slice(0, 32);
+}
+
+async function playApi(path: string, method: 'GET' | 'POST' = 'GET'): Promise<{ status: number; body: Record<string, unknown> | null }> {
+  const client = await playAuth.getClient();
+  const { token } = await client.getAccessToken();
+  const resp = await fetch(
+    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PLAY_PACKAGE_NAME}/${path}`,
+    {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(method === 'POST' ? { body: '{}' } : {}),
+    }
+  );
+  const text = await resp.text();
+  let body: Record<string, unknown> | null = null;
+  try {
+    body = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+  } catch {
+    body = { raw: text.slice(0, 200) };
+  }
+  return { status: resp.status, body };
+}
+
+export const verifyPlayPurchase = onCall(wrapCallable(async (req) => {
+  const uid = assertVerified(req);
+  const productId = String(req.data?.productId || '');
+  const purchaseToken = String(req.data?.purchaseToken || '');
+  const product = PLAY_PRODUCTS[productId];
+  if (!product) throw new HttpsError('invalid-argument', 'Produto inválido.');
+  if (purchaseToken.length < 20 || purchaseToken.length > 2048) {
+    throw new HttpsError('invalid-argument', 'Compra inválida.');
+  }
+
+  // Um doc por compra (id = hash do token): garante crédito uma vez só, mesmo com retry do app.
+  const purchaseRef = db.doc(`playPurchases/${crypto.createHash('sha256').update(purchaseToken).digest('hex').slice(0, 40)}`);
+  const tokenPath = `purchases/products/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}`;
+  // "Consumir" libera o produto pra ser comprado de novo (e confirma o recebimento pra Google,
+  // que devolve o dinheiro de compras não confirmadas em 3 dias). Best-effort; o app também tenta.
+  const consume = () =>
+    playApi(`${tokenPath}:consume`, 'POST').catch((e) => {
+      console.error('Play consume falhou', e);
+      return null;
+    });
+
+  const done = await purchaseRef.get();
+  if (done.exists) {
+    if (done.data()?.userId !== uid) {
+      throw new HttpsError('permission-denied', 'Esta compra já foi usada em outra conta.');
+    }
+    await consume();
+    return { ok: true, diamonds: Number(done.data()?.diamonds) || product.diamonds, alreadyCredited: true };
+  }
+
+  const r = await playApi(tokenPath);
+  if (r.status === 401 || r.status === 403) {
+    console.error('Play API sem permissão', r.status, r.body);
+    throw new HttpsError('failed-precondition', 'A verificação de compras do Google Play ainda não está configurada. Tente mais tarde.');
+  }
+  if (r.status === 400 || r.status === 404 || r.status === 410) {
+    throw new HttpsError('invalid-argument', 'Compra não encontrada no Google Play.');
+  }
+  if (r.status !== 200 || !r.body) {
+    console.error('Play API resposta inesperada', r.status, r.body);
+    throw new HttpsError('unavailable', 'Não foi possível confirmar a compra agora. Tente de novo em instantes.');
+  }
+
+  const p = r.body as { purchaseState?: number; orderId?: string; obfuscatedExternalAccountId?: string };
+  const state = p.purchaseState ?? 0; // 0 comprado · 1 cancelado · 2 pendente
+  if (state === 2) {
+    throw new HttpsError('failed-precondition', 'Pagamento pendente. Os diamantes entram quando for confirmado.');
+  }
+  if (state !== 0) throw new HttpsError('failed-precondition', 'Esta compra foi cancelada.');
+  // A compra foi feita com a conta ofuscada deste usuário? (impede reaproveitar token de outro)
+  if (p.obfuscatedExternalAccountId && p.obfuscatedExternalAccountId !== playAccountId(uid)) {
+    throw new HttpsError('permission-denied', 'Esta compra pertence a outra conta.');
+  }
+
+  const now = Date.now();
+  await db.runTransaction(async (tx) => {
+    const again = await tx.get(purchaseRef);
+    if (again.exists) return;
+    const userRef = db.doc(`users/${uid}`);
+    const u = await tx.get(userRef);
+    if (!u.exists) throw new HttpsError('not-found', 'Usuário não encontrado.');
+    tx.create(purchaseRef, {
+      userId: uid,
+      productId,
+      diamonds: product.diamonds,
+      orderId: p.orderId || '',
+      created_at: now,
+    });
+    tx.update(userRef, { coinsBalance: FieldValue.increment(product.diamonds) });
+    tx.set(db.collection('transactions').doc(), {
+      userId: uid,
+      amount: product.diamonds,
+      type: 'PURCHASE',
+      description: `Compra de ${product.diamonds} Diamantes (Google Play)`,
+      created_at: now,
+    });
+    // Mesmo formato dos pagamentos do Mercado Pago, pra entrar na receita do painel admin.
+    tx.set(db.collection('payments').doc(), {
+      userId: uid,
+      packageId: productId,
+      diamonds: product.diamonds,
+      amount: product.price,
+      currency: 'BRL',
+      provider: 'google_play',
+      status: 'approved',
+      playOrderId: p.orderId || '',
+      created_at: now,
+      updated_at: now,
+    });
+  });
+  await consume();
+  return { ok: true, diamonds: product.diamonds, alreadyCredited: false };
+}));
 
 // ---------------------------------------------------------------------------
 // 11-bis. Push de nova mensagem no chat — avisa quem recebeu (cliente ou profissional).

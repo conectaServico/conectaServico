@@ -3,7 +3,8 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '@/services/firebase';
 import { useUserStore } from '@/store/userStore';
 import { Proposal, ServiceRequest } from '@/types';
-import { Loader2, Briefcase, ChevronRight, CheckCircle, Clock, SlidersHorizontal, ArrowUpDown, Check } from 'lucide-react';
+import { ListSkeleton } from '@/components/Skeleton';
+import { Briefcase, ChevronRight, CheckCircle, Clock, SlidersHorizontal, ArrowUpDown, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface ProposalWithJob extends Proposal {
@@ -87,7 +88,7 @@ const ProProposals = () => {
       return b.created_at - a.created_at;
     });
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
+  if (loading) return <div className="max-w-5xl mx-auto py-2" aria-busy="true"><ListSkeleton count={3} /></div>;
 
   return (
     <div className="max-w-4xl mx-auto pb-12 space-y-8">

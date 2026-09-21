@@ -53,3 +53,75 @@ body::before {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* ---------- Acabamento (site e app) ---------- */
+
+html {
+  -webkit-tap-highlight-color: transparent; /* sem o "flash" cinza do toque no Android */
+}
+
+/* Toque mais rápido (sem espera de duplo toque) em tudo que é clicável. */
+button,
+a,
+[role='button'],
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
+/* Foco visível pra quem navega por teclado (só aparece com teclado, não com o mouse/toque). */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Botões "afundam" um pouquinho ao toque — dá a sensação de resposta imediata. */
+@media (hover: none) {
+  button:not(:disabled),
+  a[class*='rounded-full'],
+  a[class*='rounded-xl'] {
+    transition: scale 0.1s ease;
+  }
+  button:not(:disabled):active,
+  a[class*='rounded-full']:active,
+  a[class*='rounded-xl']:active {
+    scale: 0.97;
+  }
+}
+
+/* Entrada suave de cada tela (só opacidade: transform quebraria elementos "fixed" dentro da tela). */
+@keyframes route-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.route-fade {
+  animation: route-fade 0.18s ease-out;
+}
+
+/* App nativo: sem o "puxar pra recarregar"/brilho de rolagem do WebView e sem arrastar imagem. */
+.app-native,
+.app-native body {
+  overscroll-behavior-y: none;
+}
+.app-native img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Quem prefere menos movimento não recebe animações. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

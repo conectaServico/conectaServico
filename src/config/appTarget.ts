@@ -15,3 +15,11 @@ export const LOCKED_AUDIENCE: Audience | null =
       : null;
 
 export const isNativeApp = (): boolean => Capacitor.isNativePlatform();
+
+/**
+ * App Android do profissional: as compras de diamantes vão pelo Google Play Billing (regra da
+ * loja: moeda virtual comprada dentro do app), com preço +20% pra cobrir a taxa da Google.
+ * No site e no app do cliente continua o Mercado Pago / nada é vendido.
+ */
+export const isPlayBillingApp = (): boolean =>
+  LOCKED_AUDIENCE === 'professional' && Capacitor.getPlatform() === 'android';

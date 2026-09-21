@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tela de abertura (Android 11 ou menos): fundo em degradê da cor do app, dois círculos suaves
+     e a arte com logo + nome + CLIENTE/PROFISSIONAL (drawable/splash_logo.png, uma por densidade).
+     No Android 12+ o sistema mostra o ícone do app sobre a cor de fundo (splash_bg) e, em seguida,
+     a tela de carregamento do próprio app (mesmo degradê). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#1E3A8A"
+                android:centerColor="#2563EB"
+                android:endColor="#3B82F6" />
+        </shape>
+    </item>
+    <item
+        android:width="340dp"
+        android:height="340dp"
+        android:gravity="top|end"
+        android:right="-110dp"
+        android:top="-110dp">
+        <shape android:shape="oval">
+            <solid android:color="#1FFFFFFF" />
+        </shape>
+    </item>
+    <item
+        android:width="380dp"
+        android:height="380dp"
+        android:gravity="bottom|start"
+        android:bottom="-150dp"
+        android:left="-130dp">
+        <shape android:shape="oval">
+            <solid android:color="#17FFFFFF" />
+        </shape>
+    </item>
+    <item
+        android:width="300dp"
+        android:height="380dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/splash_logo" />
+    </item>
+</layer-list>

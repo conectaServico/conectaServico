@@ -7,15 +7,19 @@ import { useVerified } from '@/hooks/useVerified';
 import { useNavigate } from 'react-router-dom';
 import { Payment, Transaction, User } from '@/types';
 import { Coins, ArrowUpRight, ArrowDownRight, Loader2, CreditCard, Gift, ShieldAlert, X, CheckCircle2, QrCode } from 'lucide-react';
+import { isPlayBillingApp } from '@/config/appTarget';
+import { RowsSkeleton, Skeleton } from '@/components/Skeleton';
+import { DIAMOND_PACKAGES, packagesFor } from '@/utils/diamondPackages';
+import { buyDiamondsWithPlay, recoverPendingPlayPurchases } from '@/services/playBilling';
+import { hapticTap } from '@/services/native';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
-const DIAMOND_PACKAGES = [
-  { id: 'pkg_50', diamonds: 50, price: 9.90, popular: false },
-  { id: 'pkg_150', diamonds: 150, price: 27.90, popular: true },
-  { id: 'pkg_300', diamonds: 300, price: 49.90, popular: false },
-];
+// App Android: compra pelo Google Play (preço do app, +20%); site: Mercado Pago.
+const PLAY_MODE = isPlayBillingApp();
+const PACKAGES = packagesFor(PLAY_MODE);
+const PLAY_PRODUCT_IDS = DIAMOND_PACKAGES.map((p) => p.id);
 
 // Com a chave pública do Mercado Pago definida, usamos o checkout real; senão, o simulado.
 const MP_ENABLED = !!import.meta.env.VITE_MP_PUBLIC_KEY;
@@ -29,7 +33,7 @@ const Wallet = () => {
 
   // Store States
   const [isStoreOpen, setIsStoreOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<typeof DIAMOND_PACKAGES[0] | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<typeof PACKAGES[0] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -53,6 +57,24 @@ const Wallet = () => {
   useEffect(() => {
     reloadTransactions();
   }, [reloadTransactions]);
+
+  // App: compras que ficaram no meio do caminho (pagamento pendente, app fechado, sem rede)
+  // são conferidas de novo com o servidor ao abrir a carteira.
+  useEffect(() => {
+    if (!PLAY_MODE || !user) return;
+    let alive = true;
+    recoverPendingPlayPurchases(PLAY_PRODUCT_IDS).then(async (diamonds) => {
+      if (!alive || diamonds <= 0) return;
+      const uSnap = await getDoc(doc(db, 'users', user.id));
+      if (uSnap.exists()) setUser(uSnap.data() as User);
+      reloadTransactions();
+      toast.success(`Compra confirmada! ${diamonds} diamantes adicionados.`);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Volta do checkout do Mercado Pago (?payment=success&external_reference=<paymentId>).
   // O saldo é creditado pelo webhook — aqui só acompanhamos o doc payments/{id} até confirmar.
@@ -130,10 +152,27 @@ const Wallet = () => {
       navigate('/verify');
       return;
     }
-    if (!MP_ENABLED && !paymentMethod) return;
+    if (!PLAY_MODE && !MP_ENABLED && !paymentMethod) return;
     setProcessingPayment(true);
 
     try {
+      if (PLAY_MODE) {
+        // Google Play Billing: a janela de compra é da Google; o servidor confere e credita.
+        const diamonds = await buyDiamondsWithPlay(selectedPackage.id, user.id);
+        setUser({ ...user, coinsBalance: (user.coinsBalance || 0) + diamonds });
+        await reloadTransactions();
+        setPaymentSuccess(true);
+        toast.success('Diamantes adicionados com sucesso!');
+        hapticTap('success');
+        setTimeout(() => {
+          setIsStoreOpen(false);
+          setPaymentSuccess(false);
+          setSelectedPackage(null);
+          setPaymentMethod(null);
+        }, 3000);
+        return;
+      }
+
       if (MP_ENABLED) {
         // Checkout Pro: o servidor cria a preferência; o saldo entra depois, via webhook.
         const { data } = await createPaymentPreferenceFn({
@@ -168,7 +207,19 @@ const Wallet = () => {
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-primary" /></div>;
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 pb-10" aria-busy="true">
+        <div className="flex flex-col md:flex-row gap-6">
+          <Skeleton className="h-52 flex-1 rounded-3xl" />
+          <Skeleton className="h-52 flex-1 rounded-3xl" />
+        </div>
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <RowsSkeleton count={4} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-10">
@@ -285,7 +336,7 @@ const Wallet = () => {
                   <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto" />
                   <div>
                     <h3 className="text-xl font-bold text-slate-900 mb-2">Processando pagamento...</h3>
-                    <p className="text-slate-500 text-sm">Conectando com o Mercado Pago de forma segura.</p>
+                    <p className="text-slate-500 text-sm">{PLAY_MODE ? 'Confirmando com a Google Play de forma segura.' : 'Conectando com o Mercado Pago de forma segura.'}</p>
                   </div>
                 </div>
               ) : (
@@ -294,7 +345,7 @@ const Wallet = () => {
                     <>
                       <p className="text-slate-600 mb-6">Escolha o melhor pacote para você continuar enviando orçamentos para os clientes.</p>
                       
-                      {DIAMOND_PACKAGES.map((pkg) => (
+                      {PACKAGES.map((pkg) => (
                         <div 
                           key={pkg.id} 
                           className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer group flex items-center justify-between ${
@@ -343,7 +394,18 @@ const Wallet = () => {
                         </div>
                       </div>
 
-                      {MP_ENABLED ? (
+                      {PLAY_MODE ? (
+                        <div className="flex items-start gap-3 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 mb-8">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <ShieldAlert className="w-5 h-5 text-primary" />
+                          </div>
+                          <p className="text-sm text-slate-600 leading-relaxed">
+                            O pagamento é feito pela <strong className="text-slate-900">Google Play</strong>, com a
+                            forma de pagamento da sua conta Google. Os diamantes entram na carteira assim que o
+                            pagamento for confirmado.
+                          </p>
+                        </div>
+                      ) : MP_ENABLED ? (
                         <div className="flex items-start gap-3 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 mb-8">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <ShieldAlert className="w-5 h-5 text-primary" />
@@ -395,10 +457,12 @@ const Wallet = () => {
                         </button>
                         <button
                           onClick={handleCheckout}
-                          disabled={!MP_ENABLED && !paymentMethod}
+                          disabled={!PLAY_MODE && !MP_ENABLED && !paymentMethod}
                           className="flex-1 bg-primary text-white py-4 rounded-xl font-bold text-lg hover:bg-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex justify-center items-center gap-2"
                         >
-                          {MP_ENABLED
+                          {PLAY_MODE
+                            ? `Comprar por R$ ${selectedPackage.price.toFixed(2).replace('.', ',')}`
+                            : MP_ENABLED
                             ? `Pagar R$ ${selectedPackage.price.toFixed(2).replace('.', ',')} no Mercado Pago`
                             : `Pagar R$ ${selectedPackage.price.toFixed(2).replace('.', ',')}`}
                         </button>
@@ -407,7 +471,7 @@ const Wallet = () => {
                   )}
                   
                   <div className="mt-6 pt-4 border-t border-slate-100 text-center flex items-center justify-center gap-2 text-xs text-slate-400">
-                    <ShieldAlert className="w-4 h-4" /> Pagamento 100% seguro processado por Mercado Pago
+                    <ShieldAlert className="w-4 h-4" /> {PLAY_MODE ? 'Pagamento 100% seguro processado pela Google Play' : 'Pagamento 100% seguro processado por Mercado Pago'}
                   </div>
                 </div>
               )}

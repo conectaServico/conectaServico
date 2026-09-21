@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/services/firebase';
 import { ensurePushIfGranted, onForegroundPush, onPushTap } from '@/services/push';
+import { installBackButton } from '@/services/native';
 import { useUserStore } from '@/store/userStore';
 import { User } from '@/types';
 
@@ -11,6 +12,8 @@ import { User } from '@/types';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ScrollToTop from '@/components/ScrollToTop';
+import RouteFade from '@/components/RouteFade';
+import AppLogo from '@/components/AppLogo';
 import AppOnboarding, { markOnboardingSeen, onboardingSeen } from '@/components/AppOnboarding';
 import toast, { Toaster } from 'react-hot-toast';
 import { LOCKED_AUDIENCE } from '@/config/appTarget';
@@ -100,6 +103,24 @@ function App() {
     };
   }, [currentUser?.id]);
 
+  // Botão voltar do Android: volta uma tela; no início, duplo toque pra sair.
+  useEffect(() => {
+    let off: () => void = () => undefined;
+    let alive = true;
+    installBackButton({
+      isRoot: (path) => ['/', '/login', '/home', '/requests', '/proposals', '/chats', '/profile', '/wallet'].includes(path),
+      onExitHint: () => toast('Toque em voltar de novo para sair', { icon: '👋', duration: 2000 }),
+      goHome: () => {
+        window.history.pushState({}, '', '/');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      },
+    }).then((remove) => (alive ? (off = remove) : remove()));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
   // Quem já está logado não precisa das boas-vindas.
   useEffect(() => {
     if (currentUser && showIntro) {
@@ -154,9 +175,41 @@ function App() {
   }, [setUser, setVerification]);
 
   if (initializing) {
+    // App nativo: continua a tela de abertura (mesmo degradê, logo e nome) até o login ser conferido —
+    // sem piscar branco entre a abertura do sistema e o app. Tela cheia (cobre até a barra de status).
+    if (LOCKED_AUDIENCE) {
+      const pro = LOCKED_AUDIENCE === 'professional';
+      return (
+        <div
+          className={`fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 text-white bg-gradient-to-br ${
+            pro ? 'from-[#9A3412] via-[#EA580C] to-[#FB923C]' : 'from-[#1E3A8A] via-[#2563EB] to-[#3B82F6]'
+          }`}
+          role="status"
+          aria-label="Carregando"
+        >
+          <div className="w-44 h-44 rounded-[2.6rem] bg-white shadow-2xl flex items-center justify-center animate-pulse">
+            <img src="/logo.jpg" alt="" className="h-36 w-auto" />
+          </div>
+          <div className="text-3xl font-extrabold tracking-tight">Conecta Serviço</div>
+          <span className={`bg-white font-black tracking-[0.2em] text-sm px-6 py-2 rounded-full ${pro ? 'text-orange-600' : 'text-primary'}`}>
+            {pro ? 'PROFISSIONAL' : 'CLIENTE'}
+          </span>
+        </div>
+      );
+    }
+    // Carregamento inicial com a marca (em vez de um círculo girando no vazio).
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-white pt-[var(--safe-top)]" role="status" aria-label="Carregando">
+        <div className="animate-pulse">
+          {LOCKED_AUDIENCE ? (
+            <AppLogo />
+          ) : (
+            <img src="/logo.jpg" alt="Conecta Serviço" className="h-20 w-auto rounded-2xl" />
+          )}
+        </div>
+        <div className="h-1 w-28 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full w-1/2 rounded-full bg-primary animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -208,6 +261,7 @@ function App() {
           </div>
         )}
         <Suspense fallback={<PageFallback />}>
+          <RouteFade>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
@@ -355,6 +409,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </RouteFade>
         </Suspense>
       </Layout>
     </BrowserRouter>

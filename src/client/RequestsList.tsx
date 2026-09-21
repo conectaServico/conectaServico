@@ -16,6 +16,8 @@ import { useUserStore } from '@/store/userStore';
 import { ServiceRequest } from '@/types';
 import { Loader2, Plus, MapPin, Clock, FileText, SlidersHorizontal, ArrowUpDown, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { isRequestFull, timeLeftLabel } from '@/utils/requestLifecycle';
+import { ListSkeleton } from '@/components/Skeleton';
 import { ptBR } from 'date-fns/locale';
 
 const PAGE_SIZE = 20;
@@ -128,8 +130,8 @@ const RequestsList = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="max-w-5xl mx-auto py-2" aria-busy="true">
+        <ListSkeleton count={3} />
       </div>
     );
   }
@@ -220,6 +222,11 @@ const RequestsList = () => {
                     <Clock className="w-4 h-4" />
                     {format(request.created_at, "dd 'de' MMMM", { locale: ptBR })}
                   </span>
+                  {['OPEN', 'NEGOTIATING'].includes(request.status) && isRequestFull(request.unlockCount) && (
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Completo · 3 profissionais
+                    </span>
+                  )}
                 </div>
                 <div className="font-bold text-primary text-sm group-hover:underline">
                   Ver detalhes &rarr;
@@ -236,6 +243,12 @@ const RequestsList = () => {
                   <MapPin className="w-4 h-4 text-slate-400" />
                   {request.neighborhood}, {request.city}
                 </div>
+                {['OPEN', 'NEGOTIATING', 'IN_PROGRESS'].includes(request.status) && (
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    Fica no ar por mais {timeLeftLabel(request.created_at)}
+                  </div>
+                )}
               </div>
             </Link>
           ))}

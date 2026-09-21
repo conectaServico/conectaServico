@@ -56,7 +56,7 @@ Coleta (todos criptografados em trânsito, exclusão disponível):
 - **Informações pessoais:** nome, e-mail, telefone, endereço (CEP/rua/bairro/cidade), IDs de usuário; **CPF** (só profissional, para verificação).
 - **Fotos:** foto de perfil, fotos dos pedidos e imagens do chat.
 - **Mensagens:** conversas do chat entre cliente e profissional.
-- **Histórico de compras / financeiro:** compra de diamantes (só app do profissional). O pagamento em si é feito no Mercado Pago; o app não vê cartão nem dados de pagamento.
+- **Histórico de compras / financeiro:** compra de diamantes (só app do profissional). O pagamento em si é feito pela Google Play (no app) ou pelo Mercado Pago (no site); o app não vê cartão nem dados de pagamento.
 - **Identificadores do dispositivo:** token de notificações (FCM).
 - **Diagnóstico:** registros de erro do app (`errorLogs`), vinculados ao usuário.
 - **Não coleta:** localização por GPS (o endereço vem do CEP digitado), contatos, agenda, microfone.
@@ -128,11 +128,41 @@ O revisor precisa entrar no app. Prepare:
   Telefone → **Números de telefone para teste**, cadastre um número fictício com um código fixo, crie a conta de
   profissional com ele e informe número + código no *Acesso ao app*. (Remova o número depois da aprovação, se quiser.)
 
-## 7. Pagamentos dentro do app (decisão pendente)
+## 7. Diamantes dentro do app: Google Play Billing (implementado)
 
-- **App Cliente:** não vende nada. Sem restrição.
-- **App Profissional:** vende **diamantes**, uma moeda virtual usada dentro do app. A política de pagamentos do Google
-  exige o **Google Play Billing** para isso e não permite mandar o usuário pagar por fora dentro do app. Hoje a compra usa
-  Mercado Pago (Checkout Pro). Opções: (a) integrar o Google Play Billing só no app Profissional (Google fica com uma
-  parte da venda; o site segue com Mercado Pago); (b) publicar sem compra dentro do app (o profissional só usa o saldo
-  comprado no site, sem nenhum botão ou link de compra no app). Sugestão: publicar o **app Cliente primeiro**.
+O **app Cliente** não vende nada. O **app Profissional** vende diamantes e, por regra da Google, faz isso pelo
+**Google Play Billing** (o site continua no Mercado Pago). Como funciona:
+
+- O app abre a janela de compra da Google; o pagamento é da Google. Depois manda o comprovante (token) para a
+  function `verifyPlayPurchase`, que **confere com a Google**, credita os diamantes **uma única vez** e "consome"
+  a compra (libera pra comprar de novo). O app nunca credita nada sozinho.
+- **Preço no app = preço do site + 20%** (cobre a taxa da Google), arredondado pra cima:
+
+| Pacote | Site (Mercado Pago) | App (Google Play) |
+|---|---|---|
+| 50 diamantes  | R$ 9,90  | **R$ 11,90** |
+| 150 diamantes | R$ 27,90 | **R$ 33,90** |
+| 300 diamantes | R$ 49,90 | **R$ 59,90** |
+
+  Os preços do app estão em `src/utils/diamondPackages.ts` (`APP_PRICES`) e em `functions/src/index.ts`
+  (`PLAY_PRODUCTS`) — e **precisam ser iguais aos da Play Console**.
+- Compras que ficaram no meio do caminho (pagamento pendente, app fechado, sem internet) são conferidas de novo ao abrir a Carteira.
+
+### O que configurar (depois que a conta da Play estiver aprovada)
+
+1. **Google Cloud:** ativar a API *Google Play Android Developer API* no projeto `conectaservico-1a324`
+   (https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com?project=conectaservico-1a324).
+2. **Play Console → Monetização → Produtos → Produtos no app:** criar 3 produtos **gerenciados** com estes IDs
+   (exatamente assim): `pkg_50`, `pkg_150`, `pkg_300`, com os preços da tabela acima, status *Ativo*.
+   (Antes disso a Play pede o perfil de pagamentos/comerciante: dados da empresa e conta bancária.)
+3. **Play Console → Usuários e permissões → Convidar usuários:** convidar a conta de serviço das functions
+   (`906333174854-compute@developer.gserviceaccount.com` — confirme em Cloud Run → função → Segurança) com as
+   permissões *Ver informações financeiras* e *Gerenciar pedidos e assinaturas*. Sem isso, `verifyPlayPurchase`
+   responde "verificação de compras ainda não configurada".
+4. **Testadores de licença** (Configurações → Testadores de licença): adicionar o seu Gmail — as compras de teste
+   não cobram nada.
+5. **Testar:** enviar o `.aab` do Profissional para **Teste interno**, instalar pelo link de teste (compra só funciona
+   em app instalado pela Play) e comprar um pacote. Conferir se o saldo sobe e se o extrato mostra "(Google Play)".
+
+**Limitações conhecidas:** um reembolso feito pela Google **não** desconta os diamantes automaticamente (ajustar em
+Admin → usuário → ajustar diamantes). O preço dos diamantes é o mesmo em todas as regiões.

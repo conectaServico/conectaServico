@@ -8,6 +8,8 @@ const config: CapacitorConfig = {
   appId: audience === 'client' ? 'com.conectaservico.app' : 'com.conectaservico.pro',
   appName: audience === 'client' ? 'Conecta Serviço Cliente' : 'Conecta Serviço Profissional',
   webDir: process.env.APP_WEB_DIR || 'dist',
+  // Cor do WebView antes da 1ª tela aparecer: a mesma da abertura, pra não piscar branco.
+  backgroundColor: audience === 'client' ? '#1E3A8A' : '#9A3412',
 };
 
 export default config;

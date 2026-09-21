@@ -14,6 +14,7 @@ import { auth } from '@/services/firebase';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { CATEGORY_MENUS } from '@/utils/categories';
 import { LOCKED_AUDIENCE } from '@/config/appTarget';
+import { hapticTap } from '@/services/native';
 import AppLogo from '@/components/AppLogo';
 
 const Navbar = () => {
@@ -377,17 +378,17 @@ const Navbar = () => {
       {isAuthenticated && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe">
           <div className="flex justify-around items-center h-16">
-            <Link to="/home" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/home') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Link onClick={() => hapticTap()} to="/home" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/home') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
               <Home className="w-6 h-6" />
               <span className="text-[10px] font-bold">Início</span>
             </Link>
             
-            <Link to={user?.role === 'professional' ? '/proposals' : '/requests'} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive(user?.role === 'professional' ? '/proposals' : '/requests') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Link onClick={() => hapticTap()} to={user?.role === 'professional' ? '/proposals' : '/requests'} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive(user?.role === 'professional' ? '/proposals' : '/requests') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
               <ClipboardList className="w-6 h-6" />
               <span className="text-[10px] font-bold">{user?.role === 'professional' ? 'Propostas' : 'Pedidos'}</span>
             </Link>
             
-            <Link to="/chats" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/chats') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Link onClick={() => hapticTap()} to="/chats" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/chats') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
               <div className="relative">
                 <MessageSquare className="w-6 h-6" />
                 {hasUnread && (
@@ -397,7 +398,7 @@ const Navbar = () => {
               <span className="text-[10px] font-bold">Chat</span>
             </Link>
 
-            <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/profile') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
+            <Link onClick={() => hapticTap()} to="/profile" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${isActive('/profile') ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}>
               <User className="w-6 h-6" />
               <span className="text-[10px] font-bold">Perfil</span>
             </Link>

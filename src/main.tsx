@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { installGlobalErrorLogging } from '@/utils/errorLog'
+import { LOCKED_AUDIENCE } from '@/config/appTarget'
 
 // Depois de um deploy novo, uma aba já aberta pode tentar buscar um chunk
 // (rota lazy) que não existe mais no CDN — o Vite dispara esse evento em vez
@@ -22,6 +23,9 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 installGlobalErrorLogging()
+
+// Apps nativos (cliente/profissional): ajustes de acabamento só do WebView (ver index.css).
+if (LOCKED_AUDIENCE) document.documentElement.classList.add('app-native')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

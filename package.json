@@ -29,8 +29,11 @@
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.2.0",
     "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.3.4",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/push-notifications": "^8.1.2",
+    "@capgo/native-purchases": "^8.8.0",
     "date-fns": "^4.1.0",
     "face-api.js": "^0.22.2",
     "firebase": "^11.0.1",

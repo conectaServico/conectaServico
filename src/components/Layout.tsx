@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import Navbar from './Navbar';
 import VerificationBanner from './VerificationBanner';
+import OfflineBanner from './OfflineBanner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
@@ -22,6 +23,7 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className={`min-h-screen bg-gray-50 flex flex-col ${isAuthenticated ? 'pb-16 md:pb-0' : ''}`}>
       {!hideChrome && <Navbar />}
+      <OfflineBanner />
       {!hideChrome && <VerificationBanner />}
       {/* Sem navbar no app deslogado: páginas fora do login/cadastro (Termos, Privacidade…) precisam de um jeito de voltar. */}
       {hideChrome && !isAuthPage && (

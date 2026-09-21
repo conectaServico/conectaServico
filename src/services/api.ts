@@ -93,6 +93,12 @@ export const simulatePurchaseFn = httpsCallable<
   { ok: boolean; diamonds: number }
 >(functions, 'simulatePurchase');
 
+/** Google Play Billing (app Android do profissional): confere a compra com a Google e credita os diamantes. */
+export const verifyPlayPurchaseFn = httpsCallable<
+  { productId: string; purchaseToken: string },
+  { ok: boolean; diamonds: number; alreadyCredited: boolean }
+>(functions, 'verifyPlayPurchase');
+
 /** Mercado Pago Checkout Pro: cria a preferência e devolve a URL de checkout. */
 export const createPaymentPreferenceFn = httpsCallable<
   { packageId: string; origin: string },

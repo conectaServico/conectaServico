@@ -8,6 +8,7 @@ import { useUserStore } from '@/store/userStore';
 import { useVerified } from '@/hooks/useVerified';
 import { MapPin, Clock, Briefcase, ShieldCheck, ChevronLeft, Loader2, MessageSquare, Calendar, Hammer, Edit2, X, Check, LockOpen, Maximize, FileText, Info, MoreVertical, Map, Trash2, Phone, Mail, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { isRequestFull, timeLeftLabel } from '@/utils/requestLifecycle';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -552,10 +553,20 @@ const RequestDetails = () => {
                 <span className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${getStatusColor(request.status)}`}>
                   {getStatusText(request.status)}
                 </span>
+                {isClientOwner && ['OPEN', 'NEGOTIATING'].includes(request.status) && isRequestFull(request.unlockCount) && (
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    Completo · 3 profissionais
+                  </span>
+                )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
                 {request.subcategory || request.category} para {request.propertyType}
               </h1>
+              {['OPEN', 'NEGOTIATING', 'IN_PROGRESS'].includes(request.status) && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Este pedido fica no ar por mais {timeLeftLabel(request.created_at)}.
+                </p>
+              )}
           </div>
           
           {isClientOwner && !isEditing && (

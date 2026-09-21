@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cor de fundo da abertura no Android 12+ (início do degradê do app) -->
+    <color name="splash_bg">#1E3A8A</color>
+</resources>

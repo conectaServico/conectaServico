@@ -242,7 +242,7 @@ export interface Payment {
   diamonds: number;
   amount: number;
   currency: string;
-  provider: 'mercadopago';
+  provider: 'mercadopago' | 'google_play';
   status: PaymentStatus;
   mpPreferenceId?: string;
   mpPaymentId?: string;
