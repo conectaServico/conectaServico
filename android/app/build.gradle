@@ -16,7 +16,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // A cada envio pra Play Store, aumente o versionCode (deve ser sempre maior que o anterior).
-        versionCode 4
+        versionCode 5
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

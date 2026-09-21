@@ -1252,9 +1252,9 @@ export const createPaymentPreference = onCall({ secrets: [MP_ACCESS_TOKEN] }, wr
   const origin = String(req.data?.origin || '').replace(/\/+$/, '');
   if (!/^https?:\/\//.test(origin)) throw new HttpsError('invalid-argument', 'origin inválido.');
 
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const payerEmail = (userSnap.data()?.email as string) || undefined;
-
+  // Não pré-preenchemos `payer.email` (o comprador informa/usa a conta dele no checkout):
+  // se o e-mail do perfil fosse o da conta que recebe, o Mercado Pago trata como
+  // "pagar para si mesmo" e deixa o botão do Pix cinza.
   const now = Date.now();
   const payRef = db.collection('payments').doc();
   await payRef.set({
@@ -1288,7 +1288,6 @@ export const createPaymentPreference = onCall({ secrets: [MP_ACCESS_TOKEN] }, wr
     },
     auto_return: 'approved',
     statement_descriptor: 'CONECTASERVICO',
-    ...(payerEmail ? { payer: { email: payerEmail } } : {}),
   };
 
   const resp = await fetch(`${MP_API}/checkout/preferences`, {
